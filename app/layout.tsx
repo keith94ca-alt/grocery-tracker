@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -35,7 +32,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
         <div className="min-h-screen bg-gray-50 pb-20">
           <header className="bg-brand-600 text-white sticky top-0 z-40 shadow-md">
             <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-2">
