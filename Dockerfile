@@ -25,12 +25,15 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=7800
+ENV HOSTNAME="0.0.0.0"
+ENV DATABASE_URL="file:/data/prices.db"
 
-# Copy built app and dependencies from builder
+# Copy all necessary files from builder
+COPY --from=builder /app/package.json /app/package-lock.json* ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/public ./public
 
 # Add entrypoint script
@@ -38,9 +41,5 @@ COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 7800
-
-ENV PORT=7800
-ENV HOSTNAME="0.0.0.0"
-ENV DATABASE_URL="file:/data/prices.db"
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
