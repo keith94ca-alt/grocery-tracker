@@ -4,5 +4,5 @@ set -e
 echo "Running database migrations..."
 npx prisma migrate deploy
 
-echo "Starting application..."
-exec node server.js
+echo "Starting Next.js application..."
+exec npm start
