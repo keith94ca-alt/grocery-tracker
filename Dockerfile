@@ -14,9 +14,9 @@ RUN npm install
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build Next.js (with full output for debugging)
+# Build Next.js directly (skip npm run build to avoid duplicate prisma generate)
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN npx next build
 
 # Stage 2: Runtime
 FROM node:20-alpine AS runner
