@@ -1,6 +1,7 @@
 services:
   grocery-tracker:
     build: .
+    image: grocery-tracker:local
     container_name: grocery-tracker
     restart: unless-stopped
     environment:
