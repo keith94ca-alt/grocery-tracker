@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { convertUnitPrice, sameUnitGroup } from "@/lib/units";
+import type { DealResult } from "@/app/api/flyer-deals/route";
 
 interface PriceEntry {
   id: number;
@@ -59,6 +60,64 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
   );
 }
 
+function FlyerDealBanner({ deal }: { deal: DealResult }) {
+  const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper } = deal;
+  const unit = bestDeal.unit?.replace("per ", "") ?? "";
+  const validTo = bestDeal.validTo
+    ? new Date(bestDeal.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    : null;
+
+  return (
+    <div className={`rounded-xl border p-4 ${isCheaper
+      ? "bg-orange-50 border-orange-200"
+      : "bg-gray-50 border-gray-200"
+    }`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold flex items-center gap-1.5 ${isCheaper ? "text-orange-800" : "text-gray-700"}`}>
+            🏷️ {isCheaper ? "On Sale This Week!" : "Flyer This Week"}
+          </p>
+          <p className="text-sm text-gray-700 mt-1 font-medium truncate">{bestDeal.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{bestDeal.merchantName}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className={`text-xl font-bold ${isCheaper ? "text-orange-700" : "text-gray-800"}`}>
+            ${bestDeal.currentPrice.toFixed(2)}
+          </p>
+          <p className="text-xs text-gray-500">
+            ${bestDeal.unitPrice!.toFixed(2)}/{unit}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-orange-100 flex items-center justify-between text-xs flex-wrap gap-2">
+        <div className="flex gap-3">
+          {latestUnitPrice !== null && (
+            <span className="text-gray-500">
+              Your last: <strong className="text-gray-700">
+                ${latestUnitPrice.toFixed(2)}/{latestUnit?.replace("per ", "")}
+              </strong>
+            </span>
+          )}
+          {isCheaper && savingsPercent !== null && savingsPercent > 0 && (
+            <span className="text-green-600 font-semibold">Save {savingsPercent}%</span>
+          )}
+          {!isCheaper && latestUnitPrice !== null && (
+            <span className="text-gray-400">(Above your tracked price)</span>
+          )}
+        </div>
+        {validTo && (
+          <span className="text-gray-400">Valid until {validTo}</span>
+        )}
+      </div>
+
+      {bestDeal.saleStory && (
+        <p className="mt-1 text-xs text-orange-600 font-medium">{bestDeal.saleStory}</p>
+      )}
+    </div>
+  );
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-CA", {
     weekday: "short", month: "short", day: "numeric", year: "numeric",
@@ -72,6 +131,7 @@ export default function ItemPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deal, setDeal] = useState<DealResult | null>(null);
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -82,6 +142,17 @@ export default function ItemPage() {
       })
       .catch(() => setError("Failed to load item"))
       .finally(() => setLoading(false));
+  }, [params.id]);
+
+  // Load flyer deal in the background
+  useEffect(() => {
+    if (!params.id) return;
+    fetch(`/api/flyer-deals?itemId=${params.id}`)
+      .then((r) => r.json())
+      .then((data: DealResult[]) => {
+        if (Array.isArray(data) && data.length > 0) setDeal(data[0]);
+      })
+      .catch(() => {});
   }, [params.id]);
 
   async function deleteEntry(entryId: number) {
@@ -118,6 +189,7 @@ export default function ItemPage() {
 
   return (
     <div className="px-4 py-4 space-y-5">
+      {/* Header */}
       <div className="flex items-start gap-3">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 mt-1 text-xl">←</button>
         <div className="flex-1">
@@ -130,6 +202,10 @@ export default function ItemPage() {
         </Link>
       </div>
 
+      {/* Flyer deal banner — appears when Flipp has a match */}
+      {deal && <FlyerDealBanner deal={deal} />}
+
+      {/* Deal indicator (latest manual entry vs own historical average) */}
       {item.stats && latest && item.priceEntries.length >= 3 && (
         <DealIndicator
           price={latest.unitPrice}
@@ -139,6 +215,7 @@ export default function ItemPage() {
         />
       )}
 
+      {/* Stats grid */}
       {item.stats && (
         <div className="grid grid-cols-3 gap-2">
           {[
@@ -161,6 +238,7 @@ export default function ItemPage() {
         </p>
       )}
 
+      {/* Price history */}
       <div>
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Price History ({item.priceEntries.length})
