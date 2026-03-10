@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizePrice, getCanonicalUnit } from "@/lib/units";
 
 export async function GET(
   _request: NextRequest,
@@ -25,17 +26,24 @@ export async function GET(
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    // Compute price stats
-    const prices = item.priceEntries.map((e) => e.unitPrice);
+    // Normalize all prices to canonical unit (e.g. per kg) for fair comparison
+    const normalized = item.priceEntries.map((e) =>
+      normalizePrice(e.unitPrice, e.unit || item.unit)
+    );
+
+    const canonicalUnit = normalized[0]?.unit ?? getCanonicalUnit(item.unit);
+    const normalizedPrices = normalized.map((n) => n.price);
+
     const stats =
-      prices.length > 0
+      normalizedPrices.length > 0
         ? {
-            avg: prices.reduce((a, b) => a + b, 0) / prices.length,
-            min: Math.min(...prices),
-            max: Math.max(...prices),
-            latest: item.priceEntries[0]?.unitPrice ?? null,
+            avg: normalizedPrices.reduce((a, b) => a + b, 0) / normalizedPrices.length,
+            min: Math.min(...normalizedPrices),
+            max: Math.max(...normalizedPrices),
+            latest: normalized[0]?.price ?? null,
             latestDate: item.priceEntries[0]?.date ?? null,
             latestStore: item.priceEntries[0]?.store ?? null,
+            canonicalUnit,
           }
         : null;
 

@@ -33,6 +33,7 @@ model PriceEntry {
   price     Float
   quantity  Float    @default(1)
   unitPrice Float
+  unit      String   @default("each")
   store     String
   source    String   @default("manual")
   date      DateTime

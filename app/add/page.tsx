@@ -109,7 +109,7 @@ function AddForm() {
         }));
         setSuccess(false);
         itemInputRef.current?.focus();
-      }, 1200);
+      }, 2500);
     } catch {
       setError("Network error — please try again");
     } finally {
@@ -131,9 +131,10 @@ function AddForm() {
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
       <h2 className="text-xl font-bold text-gray-900">Add Price Entry</h2>
 
+      {/* Fixed toast notification */}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-green-800 font-medium">
-          ✅ Saved! Add another item…
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl text-sm font-medium flex items-center gap-2 animate-bounce">
+          ✅ Saved!
         </div>
       )}
       {error && (

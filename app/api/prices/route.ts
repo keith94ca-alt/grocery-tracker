@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         price: parsedPrice,
         quantity: parsedQty,
         unitPrice,
+        unit: unit || "each",
         store: store.trim(),
         source: "manual",
         date: entryDate,
