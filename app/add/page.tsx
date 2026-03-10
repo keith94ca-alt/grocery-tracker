@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
   "Deli", "Frozen", "Pantry", "Beverages", "Snacks",
-  "Household", "Personal Care", "Other"
+  "Household", "Personal Care", "Other",
 ];
 
 const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
 
 function AddForm() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const itemInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -36,34 +34,40 @@ function AddForm() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  // Focus item input on mount
   useEffect(() => {
     if (!form.itemName) {
       itemInputRef.current?.focus();
     }
-  }, [form.itemName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Fetch item suggestions
   useEffect(() => {
     if (form.itemName.length < 1) {
       setItemSuggestions([]);
       return;
     }
     const timer = setTimeout(async () => {
-      const res = await fetch(`/api/items?q=${encodeURIComponent(form.itemName)}`);
-      const data = await res.json();
-      if (Array.isArray(data)) setItemSuggestions(data.slice(0, 6));
+      try {
+        const res = await fetch(`/api/items?q=${encodeURIComponent(form.itemName)}`);
+        const data = await res.json();
+        if (Array.isArray(data)) setItemSuggestions(data.slice(0, 6));
+      } catch {
+        // ignore
+      }
     }, 200);
     return () => clearTimeout(timer);
   }, [form.itemName]);
 
-  // Fetch store suggestions
   useEffect(() => {
     const timer = setTimeout(async () => {
-      const q = form.store ? `?q=${encodeURIComponent(form.store)}` : "";
-      const res = await fetch(`/api/stores${q}`);
-      const data = await res.json();
-      if (Array.isArray(data)) setStoreSuggestions(data.slice(0, 6));
+      try {
+        const q = form.store ? `?q=${encodeURIComponent(form.store)}` : "";
+        const res = await fetch(`/api/stores${q}`);
+        const data = await res.json();
+        if (Array.isArray(data)) setStoreSuggestions(data.slice(0, 6));
+      } catch {
+        // ignore
+      }
     }, 200);
     return () => clearTimeout(timer);
   }, [form.store]);
@@ -93,7 +97,6 @@ function AddForm() {
 
       setSuccess(true);
       setTimeout(() => {
-        // Reset form but keep store
         setForm((prev) => ({
           itemName: "",
           category: "Other",
@@ -115,12 +118,7 @@ function AddForm() {
   }
 
   function selectItem(item: { name: string; category: string; unit: string }) {
-    setForm((prev) => ({
-      ...prev,
-      itemName: item.name,
-      category: item.category,
-      unit: item.unit,
-    }));
+    setForm((prev) => ({ ...prev, itemName: item.name, category: item.category, unit: item.unit }));
     setShowItemDropdown(false);
   }
 
@@ -133,31 +131,24 @@ function AddForm() {
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
       <h2 className="text-xl font-bold text-gray-900">Add Price Entry</h2>
 
-      {/* Success banner */}
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center gap-2 text-green-800 font-medium">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-green-800 font-medium">
           ✅ Saved! Add another item…
         </div>
       )}
-
-      {/* Error banner */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
           ⚠️ {error}
         </div>
       )}
 
-      {/* Item name with autocomplete */}
       <div className="space-y-1.5 relative">
         <label className="block text-sm font-medium text-gray-700">Item name *</label>
         <input
           ref={itemInputRef}
           type="text"
           value={form.itemName}
-          onChange={(e) => {
-            setForm((prev) => ({ ...prev, itemName: e.target.value }));
-            setShowItemDropdown(true);
-          }}
+          onChange={(e) => { setForm((prev) => ({ ...prev, itemName: e.target.value })); setShowItemDropdown(true); }}
           onFocus={() => setShowItemDropdown(true)}
           onBlur={() => setTimeout(() => setShowItemDropdown(false), 150)}
           placeholder="e.g., Ribeye Steak"
@@ -168,11 +159,8 @@ function AddForm() {
           <ul className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 overflow-hidden">
             {itemSuggestions.map((item) => (
               <li key={item.id}>
-                <button
-                  type="button"
-                  onMouseDown={() => selectItem(item)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100"
-                >
+                <button type="button" onMouseDown={() => selectItem(item)}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100">
                   <span className="font-medium">{item.name}</span>
                   <span className="text-gray-500 ml-2">{item.category} · {item.unit}</span>
                 </button>
@@ -182,93 +170,60 @@ function AddForm() {
         )}
       </div>
 
-      {/* Category & Unit row */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700">Category</label>
-          <select
-            value={form.category}
-            onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
+          <select value={form.category} onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
             {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
           </select>
         </div>
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700">Unit</label>
-          <select
-            value={form.unit}
-            onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
-            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
+          <select value={form.unit} onChange={(e) => setForm((prev) => ({ ...prev, unit: e.target.value }))}
+            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500">
             {UNITS.map((u) => <option key={u}>{u}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Price & Quantity row */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700">Price ($) *</label>
-          <input
-            type="number"
-            value={form.price}
+          <input type="number" value={form.price}
             onChange={(e) => setForm((prev) => ({ ...prev, price: e.target.value }))}
-            placeholder="0.00"
-            step="0.01"
-            min="0.01"
-            required
-            inputMode="decimal"
-            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
+            placeholder="0.00" step="0.01" min="0.01" required inputMode="decimal"
+            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700">Quantity</label>
-          <input
-            type="number"
-            value={form.quantity}
+          <input type="number" value={form.quantity}
             onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))}
-            placeholder="1"
-            step="0.001"
-            min="0.001"
-            inputMode="decimal"
-            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
+            placeholder="1" step="0.001" min="0.001" inputMode="decimal"
+            className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
         </div>
       </div>
 
-      {/* Unit price computed */}
       {unitPrice !== null && (
-        <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-2 text-sm text-brand-700">
-          <span className="font-medium">Unit price: ${unitPrice.toFixed(2)}/{form.unit}</span>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2 text-sm text-green-700">
+          Unit price: <strong>${unitPrice.toFixed(2)}/{form.unit}</strong>
         </div>
       )}
 
-      {/* Store with autocomplete */}
       <div className="space-y-1.5 relative">
         <label className="block text-sm font-medium text-gray-700">Store *</label>
-        <input
-          type="text"
-          value={form.store}
-          onChange={(e) => {
-            setForm((prev) => ({ ...prev, store: e.target.value }));
-            setShowStoreDropdown(true);
-          }}
+        <input type="text" value={form.store}
+          onChange={(e) => { setForm((prev) => ({ ...prev, store: e.target.value })); setShowStoreDropdown(true); }}
           onFocus={() => setShowStoreDropdown(true)}
           onBlur={() => setTimeout(() => setShowStoreDropdown(false), 150)}
-          placeholder="e.g., St. Jacobs Market"
-          required
-          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+          placeholder="e.g., St. Jacobs Market" required
+          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
         {showStoreDropdown && storeSuggestions.length > 0 && (
           <ul className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 overflow-hidden">
             {storeSuggestions.map((store) => (
               <li key={store.id}>
-                <button
-                  type="button"
-                  onMouseDown={() => selectStore(store)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100 font-medium"
-                >
+                <button type="button" onMouseDown={() => selectStore(store)}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100 font-medium">
                   {store.name}
                 </button>
               </li>
@@ -277,35 +232,25 @@ function AddForm() {
         )}
       </div>
 
-      {/* Date */}
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-gray-700">Date</label>
-        <input
-          type="date"
-          value={form.date}
+        <input type="date" value={form.date}
           onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
-          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
       </div>
 
-      {/* Notes */}
       <div className="space-y-1.5">
-        <label className="block text-sm font-medium text-gray-700">Notes <span className="text-gray-400">(optional)</span></label>
-        <input
-          type="text"
-          value={form.notes}
+        <label className="block text-sm font-medium text-gray-700">
+          Notes <span className="text-gray-400">(optional)</span>
+        </label>
+        <input type="text" value={form.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
           placeholder="e.g., on sale, organic, AAA grade"
-          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
       </div>
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full py-4 bg-brand-600 hover:bg-brand-700 active:bg-brand-700 text-white font-semibold rounded-xl text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-      >
+      <button type="submit" disabled={submitting}
+        className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
         {submitting ? "Saving…" : "Save Price Entry"}
       </button>
     </form>
