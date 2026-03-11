@@ -142,8 +142,10 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
             </span>
           )}
         </div>
-        {validFrom && validTo && (
-          <span className="text-gray-400">Valid {validFrom} – {validTo}</span>
+        {validTo && (
+          <span className="text-gray-400">
+            {validFrom ? `Valid ${validFrom} – ${validTo}` : `Until ${validTo}`}
+          </span>
         )}
       </div>
     </div>

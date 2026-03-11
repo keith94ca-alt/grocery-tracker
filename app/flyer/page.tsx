@@ -167,8 +167,10 @@ function AddModal({
                   </span>
                 )}
               </span>
-              {validFrom && validTo && (
-                <span className="text-xs text-gray-400">{validFrom} – {validTo}</span>
+              {validTo && (
+                <span className="text-xs text-gray-400">
+                  {validFrom ? `${validFrom} – ${validTo}` : `Until ${validTo}`}
+                </span>
               )}
             </div>
             {flippItem.saleStory && (
