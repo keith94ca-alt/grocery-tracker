@@ -113,13 +113,85 @@ export function simplifyFlyerName(name: string): string {
 }
 
 /**
- * Returns true if all significant words of `trackedName` appear in `flippName`.
- * "Ground Beef" matches "Extra Lean Ground Beef 454g" but NOT "Beef Broth".
+ * Only strip words that are truly meaningless noise — NOT product descriptors.
+ * "whole", "skim", "lean", "boneless" etc. are kept because they DO distinguish products.
+ * e.g. "Whole Milk" must NOT match "Skim Milk".
+ */
+const NOISE_WORDS = new Set([
+  "the", "and", "with", "from", "for", "per", "new", "our",
+  // Vague brand/marketing filler that never describes the product
+  "brand", "store",
+]);
+
+/**
+ * Extract meaningful keywords from a product name.
+ * Only strips: size/unit tokens (454g, 2kg, 500mL, 12pk) and pure noise words.
+ * Keeps all product-differentiating descriptors (whole, skim, lean, boneless, etc.)
+ *
+ * "Whole Milk 4L"                → { whole, milk }
+ * "Extra Lean Ground Beef 454 g" → { extra, lean, ground, beef }
+ * "Boneless Skinless Chicken Breast 900g" → { boneless, skinless, chicken, breast }
+ */
+function keyWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      // Strip size/unit tokens: 454g, 2kg, 500mL, 12pk, 1.5lb, etc.
+      .replace(/\d+(?:\.\d+)?\s*(?:kg|g|lb|lbs|L|mL|oz|pk|pack|ct|count)s?\b/gi, "")
+      // Split on whitespace and punctuation — but NOT on % so "3.2%" stays intact
+      .split(/[\s,/&()\-+]+/)
+      // Keep words 3+ chars, drop bare numbers, drop noise words
+      .filter((w) => w.length > 2 && !/^\d+$/.test(w) && !NOISE_WORDS.has(w))
+  );
+}
+
+/**
+ * Fuzzy word match — handles singular/plural ("drumstick" ↔ "drumsticks").
+ * Requires the shorter word to be at least 80% the length of the longer one to
+ * avoid spurious substring matches (e.g. "steak" should not match "beefsteak").
+ */
+function wordMatches(wa: string, wb: string): boolean {
+  if (wa === wb) return true;
+  const [shorter, longer] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+  return longer.includes(shorter) && shorter.length / longer.length >= 0.8;
+}
+
+/**
+ * Count keywords from `a` that match any keyword in `b`.
+ */
+function fuzzyIntersect(a: Set<string>, b: Set<string>): number {
+  return [...a].filter((wa) => [...b].some((wb) => wordMatches(wa, wb))).length;
+}
+
+/**
+ * Returns true if `flippName` is a meaningful match for a tracked item named `trackedName`.
+ *
+ * Two-stage check:
+ *  1. ALL keywords from the tracked name must appear in the Flipp name.
+ *     Ensures "Whole Milk" only matches flyer items that contain the word "whole".
+ *     Ensures "Ground Beef" only matches items with both "ground" and "beef".
+ *
+ *  2. Bidirectional Jaccard similarity ≥ 0.35 prevents a short tracked name
+ *     like "Chicken" from matching a very different product ("Chicken Burger Nuggets").
+ *       "Chicken" vs "Chicken Breast"         → Jaccard 0.50 → ✅ match
+ *       "Chicken" vs "Chicken Burger Nuggets" → Jaccard 0.25 → ❌ rejected
  */
 export function matchesTrackedItem(flippName: string, trackedName: string): boolean {
-  const flippLower = flippName.toLowerCase();
-  const words = trackedName.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
-  return words.length > 0 && words.every((w) => flippLower.includes(w));
+  const flippKw = keyWords(flippName);
+  const trackedKw = keyWords(trackedName);
+
+  if (trackedKw.size === 0 || flippKw.size === 0) return false;
+
+  // Stage 1 — all tracked keywords must be present in the flipp name
+  const allPresent = [...trackedKw].every((tw) =>
+    [...flippKw].some((fw) => wordMatches(tw, fw))
+  );
+  if (!allPresent) return false;
+
+  // Stage 2 — bidirectional Jaccard similarity
+  const intersect = fuzzyIntersect(trackedKw, flippKw);
+  const union = trackedKw.size + flippKw.size - intersect;
+  return union > 0 && intersect / union >= 0.35;
 }
 
 /** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */
