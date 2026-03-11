@@ -19,7 +19,7 @@ export interface FlyerBrowseItem {
 
 export async function GET() {
   try {
-    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const twoWeeksAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
     const [flippItems, trackedItems, recentFlyerEntries] = await Promise.all([
       fetchFlyerBrowse(POSTAL_CODE),

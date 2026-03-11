@@ -57,9 +57,9 @@ export async function GET(request: NextRequest) {
 
       // If the user recently manually logged a flyer price, prefer showing that
       // store's deal rather than the auto-detected cheapest.
-      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       const recentFlyerEntry = item.priceEntries.find(
-        (e) => e.source === "flyer" && new Date(e.date) >= twoWeeksAgo
+        (e) => e.source === "flyer" && new Date(e.date) >= oneWeekAgo
       ) ?? null;
 
       // Prefer items with a parseable unit price; fall back to cheapest raw price
