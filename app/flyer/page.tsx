@@ -8,6 +8,24 @@ import type { FlippItem } from "@/lib/flipp";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
+// ── Image lightbox ─────────────────────────────────────────────────────────────
+
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/70 z-[80]" onClick={onClose} />
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={onClose}>
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </>
+  );
+}
+
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 interface ModalState {
@@ -33,6 +51,7 @@ function AddModal({
   const [category, setCategory] = useState(trackedMatch?.category ?? "Meat");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   // Unit mode — "auto" only available when Flipp gives us a parseable size
   const hasAutoUnit = !!(flippItem.unitPrice && flippItem.unit);
@@ -132,6 +151,10 @@ function AddModal({
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
 
+      {lightboxImg && (
+        <ImageLightbox src={lightboxImg} alt={flippItem.name} onClose={() => setLightboxImg(null)} />
+      )}
+
       {/* Centered modal */}
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -155,27 +178,38 @@ function AddModal({
           </div>
 
           {/* Flyer item info (read-only) */}
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
-            <p className="font-medium text-gray-800">{flippItem.name}</p>
-            <p className="text-gray-500 mt-0.5">{flippItem.merchantName}</p>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-xl font-bold text-orange-700">
-                ${flippItem.currentPrice.toFixed(2)}
-                {flippItem.unitPrice && flippItem.unit && (
-                  <span className="text-sm font-normal text-gray-500 ml-1">
-                    (${flippItem.unitPrice.toFixed(2)}/{flippItem.unit.replace("per ", "")})
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm flex gap-3 items-start">
+            {flippItem.imageUrl && (
+              <img
+                src={flippItem.imageUrl}
+                alt={flippItem.name}
+                className="w-16 h-16 rounded-lg object-cover shrink-0 bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                loading="lazy"
+                onClick={() => setLightboxImg(flippItem.imageUrl!)}
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-800">{flippItem.name}</p>
+              <p className="text-gray-500 mt-0.5">{flippItem.merchantName}</p>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xl font-bold text-orange-700">
+                  ${flippItem.currentPrice.toFixed(2)}
+                  {flippItem.unitPrice && flippItem.unit && (
+                    <span className="text-sm font-normal text-gray-500 ml-1">
+                      (${flippItem.unitPrice.toFixed(2)}/{flippItem.unit.replace("per ", "")})
+                    </span>
+                  )}
+                </span>
+                {validTo && (
+                  <span className="text-xs text-gray-400">
+                    {validFrom ? `${validFrom} – ${validTo}` : `Until ${validTo}`}
                   </span>
                 )}
-              </span>
-              {validTo && (
-                <span className="text-xs text-gray-400">
-                  {validFrom ? `${validFrom} – ${validTo}` : `Until ${validTo}`}
-                </span>
+              </div>
+              {flippItem.saleStory && (
+                <p className="text-xs text-orange-600 mt-1 font-medium">{flippItem.saleStory}</p>
               )}
             </div>
-            {flippItem.saleStory && (
-              <p className="text-xs text-orange-600 mt-1 font-medium">{flippItem.saleStory}</p>
-            )}
           </div>
 
           {/* Unit mode selector */}
@@ -328,11 +362,25 @@ function FlyerCard({
 }) {
   const { flippItem, trackedMatch } = item;
   const unitLabel = flippItem.unit?.replace("per ", "");
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   return (
+    <>
+    {lightboxImg && (
+      <ImageLightbox src={lightboxImg} alt={flippItem.name} onClose={() => setLightboxImg(null)} />
+    )}
     <div className={`bg-white rounded-xl border p-4 flex gap-3 items-start ${
       added ? "border-green-200 opacity-60" : trackedMatch ? "border-brand-200" : "border-gray-200"
     }`}>
+      {flippItem.imageUrl && (
+        <img
+          src={flippItem.imageUrl}
+          alt={flippItem.name}
+          className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+          loading="lazy"
+          onClick={() => setLightboxImg(flippItem.imageUrl!)}
+        />
+      )}
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm leading-snug">{flippItem.name}</p>
         <p className="text-xs text-gray-500 mt-0.5">{flippItem.merchantName}</p>
@@ -367,6 +415,7 @@ function FlyerCard({
         )}
       </div>
     </div>
+    </>
   );
 }
 

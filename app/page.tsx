@@ -33,6 +33,22 @@ interface SearchResult {
   stats: { avg: number; min: number; max: number; count: number } | null;
 }
 
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/70 z-[80]" onClick={onClose} />
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={onClose}>
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </>
+  );
+}
+
 function DealBadge({ price, stats }: { price: number; stats: NonNullable<SearchResult["stats"]> }) {
   if (stats.count < 3) return null;
   const ratio = price / stats.avg;
@@ -57,6 +73,7 @@ export default function SearchPage() {
   const [itemsLoading, setItemsLoading] = useState(true);
   const [dealsMap, setDealsMap] = useState<Map<number, DealResult>>(new Map());
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/items?stats=true")
@@ -123,6 +140,9 @@ export default function SearchPage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
+      {lightboxImg && (
+        <ImageLightbox src={lightboxImg.src} alt={lightboxImg.alt} onClose={() => setLightboxImg(null)} />
+      )}
       {/* Search bar */}
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
@@ -242,7 +262,7 @@ export default function SearchPage() {
                         ? "bg-green-50 border-green-200"
                         : "bg-orange-50 border-orange-200"
                     }`}>
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900">{deal.itemName}</p>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
@@ -254,7 +274,7 @@ export default function SearchPage() {
                           </p>
                         )}
                       </div>
-                      <div className="text-right ml-3 shrink-0">
+                      <div className="text-right shrink-0">
                         <p className={`text-lg font-bold ${isGood ? "text-green-700" : "text-orange-700"}`}>
                           ${deal.bestDeal.currentPrice.toFixed(2)}
                         </p>
@@ -270,6 +290,19 @@ export default function SearchPage() {
                           <span className="text-xs font-semibold text-orange-500">On Sale</span>
                         ) : null}
                       </div>
+                      {deal.bestDeal.imageUrl && (
+                        <img
+                          src={deal.bestDeal.imageUrl}
+                          alt={deal.bestDeal.name}
+                          className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                          loading="lazy"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLightboxImg({ src: deal.bestDeal.imageUrl!, alt: deal.bestDeal.name });
+                          }}
+                        />
+                      )}
                     </div>
                     {/* Only show price comparison when units are actually comparable */}
                     {unitsComparable && (

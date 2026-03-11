@@ -35,6 +35,24 @@ interface ItemDetail {
   } | null;
 }
 
+// ── Image lightbox ─────────────────────────────────────────────────────────────
+
+function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/70 z-[80]" onClick={onClose} />
+      <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={onClose}>
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </>
+  );
+}
+
 function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; unit: string; avg: number; canonicalUnit: string }) {
   const converted = convertUnitPrice(price, unit, canonicalUnit) ?? price;
   const ratio = converted / avg;
@@ -64,6 +82,7 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
 function FlyerDealBanner({ deal }: { deal: DealResult }) {
   const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
           flyerUnitPrice, flyerUnit } = deal;
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const validFrom = bestDeal.validFrom
     ? new Date(bestDeal.validFrom).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
     : null;
@@ -85,6 +104,10 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
   const canCompare = flyerUnitPrice !== null && latestUnitPrice !== null && flyerUnit === latestUnit;
 
   return (
+    <>
+    {lightboxImg && (
+      <ImageLightbox src={lightboxImg} alt={bestDeal.name} onClose={() => setLightboxImg(null)} />
+    )}
     <div className={`rounded-xl border p-4 ${colour.bg} ${colour.border}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -107,16 +130,27 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
             <p className="mt-1 text-xs text-orange-600 font-medium">{bestDeal.saleStory}</p>
           )}
         </div>
-        <div className="text-right shrink-0">
-          <p className={`text-xl font-bold ${colour.price}`}>
-            ${bestDeal.currentPrice.toFixed(2)}
-          </p>
-          {/* Show the normalised per-kg/L price if we have it */}
-          {flyerUnitPrice !== null && flyerUnit && (
-            <p className="text-xs text-gray-500 font-medium">
-              ${flyerUnitPrice.toFixed(2)}/{flyerUnit.replace("per ", "")}
-            </p>
+        <div className="flex items-start gap-3 shrink-0">
+          {bestDeal.imageUrl && (
+            <img
+              src={bestDeal.imageUrl}
+              alt={bestDeal.name}
+              className="w-14 h-14 rounded-lg object-cover bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+              loading="lazy"
+              onClick={() => setLightboxImg(bestDeal.imageUrl!)}
+            />
           )}
+          <div className="text-right">
+            <p className={`text-xl font-bold ${colour.price}`}>
+              ${bestDeal.currentPrice.toFixed(2)}
+            </p>
+            {/* Show the normalised per-kg/L price if we have it */}
+            {flyerUnitPrice !== null && flyerUnit && (
+              <p className="text-xs text-gray-500 font-medium">
+                ${flyerUnitPrice.toFixed(2)}/{flyerUnit.replace("per ", "")}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -149,6 +183,7 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 
