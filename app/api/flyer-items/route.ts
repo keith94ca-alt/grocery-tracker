@@ -9,6 +9,7 @@ export interface TrackedMatch {
   name: string;
   unit: string;
   category: string;
+  recentlyLogged: boolean; // true if a flyer price was already added within the past 14 days
 }
 
 export interface FlyerBrowseItem {
@@ -18,18 +19,31 @@ export interface FlyerBrowseItem {
 
 export async function GET() {
   try {
-    const [flippItems, trackedItems] = await Promise.all([
+    const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
+    const [flippItems, trackedItems, recentFlyerEntries] = await Promise.all([
       fetchFlyerBrowse(POSTAL_CODE),
       prisma.item.findMany({
         select: { id: true, name: true, unit: true, category: true },
         orderBy: { name: "asc" },
       }),
+      prisma.priceEntry.findMany({
+        where: { source: "flyer", date: { gte: twoWeeksAgo } },
+        select: { itemId: true },
+      }),
     ]);
+
+    const recentlyLoggedIds = new Set(recentFlyerEntries.map((e) => e.itemId));
 
     const result: FlyerBrowseItem[] = flippItems.map((flippItem) => {
       const match =
         trackedItems.find((t) => matchesTrackedItem(flippItem.name, t.name)) ?? null;
-      return { flippItem, trackedMatch: match };
+      return {
+        flippItem,
+        trackedMatch: match
+          ? { ...match, recentlyLogged: recentlyLoggedIds.has(match.id) }
+          : null,
+      };
     });
 
     // Sort: items without a tracked match first (new finds), then matched
