@@ -110,11 +110,14 @@ function AddModal({
     }
   }
 
+  const validFrom = flippItem.validFrom
+    ? new Date(flippItem.validFrom).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    : null;
   const validTo = flippItem.validTo
     ? new Date(flippItem.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
     : null;
 
-  const flippSearchUrl = `https://flipp.com/search?q=${encodeURIComponent(flippItem.name)}`;
+  const flippUrl = flippItem.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(flippItem.name)}`;
 
   const unitModes: { label: string; value: UnitMode }[] = [
     ...(hasAutoUnit ? [{ label: "Auto-detect", value: "auto" as UnitMode }] : []),
@@ -142,7 +145,7 @@ function AddModal({
               {trackedMatch ? "Update price" : "Track this item"}
             </h2>
             <a
-              href={flippSearchUrl}
+              href={flippUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-brand-600 font-medium underline shrink-0 mt-1"
@@ -164,7 +167,9 @@ function AddModal({
                   </span>
                 )}
               </span>
-              {validTo && <span className="text-xs text-gray-400">Until {validTo}</span>}
+              {validFrom && validTo && (
+                <span className="text-xs text-gray-400">{validFrom} – {validTo}</span>
+              )}
             </div>
             {flippItem.saleStory && (
               <p className="text-xs text-orange-600 mt-1 font-medium">{flippItem.saleStory}</p>
@@ -398,7 +403,7 @@ export default function FlyerPage() {
   const trackedItems = items.filter((i) => i.trackedMatch);
 
   const displayed = (tab === "new" ? newItems : trackedItems).filter((i) => {
-    // Hide if already added this session OR already logged from a flyer in the past 2 weeks
+    // Hide if already added this session OR already logged from a flyer this week
     if (added.has(i.flippItem.id)) return false;
     if (tab === "tracked" && i.trackedMatch?.recentlyLogged) return false;
     const matchesStore = storeFilter === "All" || i.flippItem.merchantName === storeFilter;

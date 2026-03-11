@@ -13,6 +13,7 @@ interface PriceEntry {
   unitPrice: number;
   unit: string;
   store: string;
+  source: string | null;
   date: string;
   notes: string | null;
 }
@@ -63,10 +64,13 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
 function FlyerDealBanner({ deal }: { deal: DealResult }) {
   const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
           flyerUnitPrice, flyerUnit } = deal;
+  const validFrom = bestDeal.validFrom
+    ? new Date(bestDeal.validFrom).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    : null;
   const validTo = bestDeal.validTo
     ? new Date(bestDeal.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
     : null;
-  const flippSearchUrl = `https://flipp.com/search?q=${encodeURIComponent(bestDeal.name)}`;
+  const flippUrl = bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(bestDeal.name)}`;
 
   // Colour scheme: green = confirmed cheaper, orange = on sale / can't compare, gray = unknown
   const colour = isCheaper
@@ -89,7 +93,7 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
               🏷️ {isCheaper ? "On Sale This Week!" : "On Flyer This Week"}
             </p>
             <a
-              href={flippSearchUrl}
+              href={flippUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-brand-600 underline font-medium"
@@ -138,7 +142,9 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
             </span>
           )}
         </div>
-        {validTo && <span className="text-gray-400">Valid until {validTo}</span>}
+        {validFrom && validTo && (
+          <span className="text-gray-400">Valid {validFrom} – {validTo}</span>
+        )}
       </div>
     </div>
   );
@@ -282,6 +288,9 @@ export default function ItemPage() {
               const converted = sameUnitGroup(entryUnit, canonicalUnit) && entryUnit !== canonicalUnit
                 ? convertUnitPrice(entry.unitPrice, entryUnit, canonicalUnit)
                 : null;
+              const isFlyer = entry.source === "flyer";
+              const flyerExpired = isFlyer &&
+                new Date(entry.date).getTime() + 7 * 24 * 60 * 60 * 1000 < Date.now();
               return (
                 <div key={entry.id}
                   className={`bg-white rounded-xl border p-4 flex justify-between items-start gap-3 ${idx === 0 ? "border-brand-200 shadow-sm" : "border-gray-200"}`}>
@@ -297,6 +306,15 @@ export default function ItemPage() {
                       )}
                       {idx === 0 && (
                         <span className="text-xs px-1.5 py-0.5 bg-brand-100 text-brand-700 rounded font-medium">latest</span>
+                      )}
+                      {isFlyer && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                          flyerExpired
+                            ? "bg-gray-100 text-gray-400"
+                            : "bg-orange-100 text-orange-700"
+                        }`}>
+                          {flyerExpired ? "flyer (expired)" : "🏷️ flyer deal"}
+                        </span>
                       )}
                     </div>
                     <p className="text-sm text-gray-600 mt-0.5 font-medium">{entry.store}</p>

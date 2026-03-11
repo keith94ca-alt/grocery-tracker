@@ -78,6 +78,7 @@ export interface FlippItem {
   saleStory: string | null;
   validFrom: string;
   validTo: string;
+  pageUrl: string | null;   // direct link to flyer page
   imageUrl: string | null;
   unitPrice: number | null; // normalized price (e.g. per kg)
   unit: string | null;      // canonical unit (e.g. "per kg")
@@ -272,10 +273,15 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
     const data = await res.json();
     const rawItems: any[] = data.items ?? [];
 
+    const now = new Date();
+
     return rawItems
       .filter((item) => {
         const merchant = (item.merchant_name ?? "").toLowerCase();
-        return TARGET_MERCHANTS.some((m) => merchant.includes(m));
+        if (!TARGET_MERCHANTS.some((m) => merchant.includes(m))) return false;
+        // Drop items whose flyer has already expired
+        if (item.valid_to && new Date(item.valid_to) < now) return false;
+        return true;
       })
       .map((item): FlippItem => {
         const currentPrice: number = item.current_price ?? 0;
@@ -303,6 +309,7 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
           saleStory: item.sale_story ?? null,
           validFrom: item.valid_from ?? "",
           validTo: item.valid_to ?? "",
+          pageUrl: item.page_destination_url ?? null,
           imageUrl: item.clean_image_url ?? null,
           unitPrice,
           unit,
