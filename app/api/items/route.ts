@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, category, unit } = body;
+    const { name, category, unit, watched } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Item name is required" }, { status: 400 });
@@ -83,11 +83,17 @@ export async function POST(request: NextRequest) {
 
     const item = await prisma.item.upsert({
       where: { name: name.trim() },
-      update: { category: category || "Other", unit: unit || "each" },
+      update: {
+        category: category || "Other",
+        unit: unit || "each",
+        // Only set watched=true if explicitly requested (never unwatch via upsert)
+        ...(watched === true ? { watched: true } : {}),
+      },
       create: {
         name: name.trim(),
         category: category || "Other",
         unit: unit || "each",
+        watched: watched === true,
       },
     });
 

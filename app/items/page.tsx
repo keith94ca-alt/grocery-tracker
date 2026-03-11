@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
 const CATEGORIES = [
@@ -168,6 +168,152 @@ function DeleteConfirm({
   );
 }
 
+// ── Watch Modal ───────────────────────────────────────────────────────────────
+function WatchModal({
+  onClose,
+  onAdded,
+}: {
+  onClose: () => void;
+  onAdded: (item: ManagedItem) => void;
+}) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("Other");
+  const [unit, setUnit] = useState("each");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Autocomplete: search existing items as user types
+  function handleNameChange(val: string) {
+    setName(val);
+    setError(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (val.trim().length < 2) { setSuggestions([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/items?q=${encodeURIComponent(val)}`);
+        const data = await res.json();
+        if (Array.isArray(data)) setSuggestions(data.slice(0, 5));
+      } catch { /* ignore */ }
+      setShowSuggestions(true);
+    }, 250);
+  }
+
+  async function handleSave() {
+    if (!name.trim()) { setError("Item name is required"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), category, unit, watched: true }),
+      });
+      if (!res.ok) { setError("Failed to save — try again"); return; }
+      const created = await res.json();
+      onAdded({ ...created, _count: { priceEntries: 0 } });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Watch an Item</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            No price needed — we'll alert you when it hits the flyer.
+          </p>
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+        )}
+
+        <div className="space-y-3">
+          {/* Name with autocomplete */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Item name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="e.g. Chicken Thighs"
+              autoFocus
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                {suggestions.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onMouseDown={() => { setName(s.name); setSuggestions([]); setShowSuggestions(false); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                    >
+                      {s.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <select
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {UNITS.map((u) => <option key={u}>{u}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "⭐ Watch"}
+          </button>
+        </div>
+
+        <p className="text-center text-xs text-gray-400">
+          Want to log a price now?{" "}
+          <Link href="/add" className="text-brand-600 font-medium" onClick={onClose}>
+            Use the Add form →
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ItemsPage() {
   const [items, setItems] = useState<ManagedItem[]>([]);
@@ -176,6 +322,7 @@ export default function ItemsPage() {
   const [editItem, setEditItem] = useState<ManagedItem | null>(null);
   const [deleteItem, setDeleteItem] = useState<ManagedItem | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [showWatchModal, setShowWatchModal] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,12 +377,12 @@ export default function ItemsPage() {
             )}
           </h1>
         </div>
-        <Link
-          href="/add"
+        <button
+          onClick={() => setShowWatchModal(true)}
           className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-semibold"
         >
-          + Add
-        </Link>
+          ⭐ Watch
+        </button>
       </div>
 
       {/* Search */}
@@ -303,6 +450,19 @@ export default function ItemsPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Watch modal */}
+      {showWatchModal && (
+        <WatchModal
+          onClose={() => setShowWatchModal(false)}
+          onAdded={(newItem) => {
+            setItems((prev) =>
+              [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name))
+            );
+            setShowWatchModal(false);
+          }}
+        />
       )}
 
       {/* Edit modal */}
