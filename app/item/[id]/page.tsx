@@ -62,6 +62,7 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
 
 function FlyerDealBanner({ deal }: { deal: DealResult }) {
   const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper } = deal;
+  const hasUnitPrice = bestDeal.unitPrice != null && bestDeal.unit != null;
   const unit = bestDeal.unit?.replace("per ", "") ?? "";
   const validTo = bestDeal.validTo
     ? new Date(bestDeal.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
@@ -75,18 +76,23 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <p className={`text-sm font-bold flex items-center gap-1.5 ${isCheaper ? "text-orange-800" : "text-gray-700"}`}>
-            🏷️ {isCheaper ? "On Sale This Week!" : "Flyer This Week"}
+            🏷️ {isCheaper ? "On Sale This Week!" : "On Flyer This Week"}
           </p>
           <p className="text-sm text-gray-700 mt-1 font-medium truncate">{bestDeal.name}</p>
           <p className="text-xs text-gray-500 mt-0.5">{bestDeal.merchantName}</p>
+          {bestDeal.saleStory && (
+            <p className="mt-1 text-xs text-orange-600 font-medium">{bestDeal.saleStory}</p>
+          )}
         </div>
         <div className="text-right shrink-0">
           <p className={`text-xl font-bold ${isCheaper ? "text-orange-700" : "text-gray-800"}`}>
             ${bestDeal.currentPrice.toFixed(2)}
           </p>
-          <p className="text-xs text-gray-500">
-            ${bestDeal.unitPrice!.toFixed(2)}/{unit}
-          </p>
+          {hasUnitPrice && (
+            <p className="text-xs text-gray-500">
+              ${bestDeal.unitPrice!.toFixed(2)}/{unit}
+            </p>
+          )}
         </div>
       </div>
 
@@ -102,18 +108,17 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
           {isCheaper && savingsPercent !== null && savingsPercent > 0 && (
             <span className="text-green-600 font-semibold">Save {savingsPercent}%</span>
           )}
-          {!isCheaper && latestUnitPrice !== null && (
+          {!isCheaper && latestUnitPrice !== null && hasUnitPrice && (
             <span className="text-gray-400">(Above your tracked price)</span>
+          )}
+          {!hasUnitPrice && (
+            <span className="text-gray-400">Open Flyer tab to log price per kg</span>
           )}
         </div>
         {validTo && (
           <span className="text-gray-400">Valid until {validTo}</span>
         )}
       </div>
-
-      {bestDeal.saleStory && (
-        <p className="mt-1 text-xs text-orange-600 font-medium">{bestDeal.saleStory}</p>
-      )}
     </div>
   );
 }

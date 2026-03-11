@@ -15,6 +15,8 @@ interface ModalState {
   trackedMatch: TrackedMatch | null;
 }
 
+type UnitMode = "auto" | "per kg" | "per lb" | "per pack" | "each";
+
 function AddModal({
   state,
   onClose,
@@ -32,11 +34,48 @@ function AddModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Determine what quantity/unit to send
-  const qty = flippItem.unitPrice && flippItem.unit
-    ? flippItem.currentPrice / flippItem.unitPrice  // qty in canonical units (kg or L)
-    : 1;
-  const unit = flippItem.unit ?? "each";
+  // Unit mode — "auto" only available when Flipp gives us a parseable size
+  const hasAutoUnit = !!(flippItem.unitPrice && flippItem.unit);
+  const [unitMode, setUnitMode] = useState<UnitMode>(hasAutoUnit ? "auto" : "each");
+
+  // Pack weight entry (only shown when unitMode === "per pack")
+  const [packWeight, setPackWeight] = useState("");
+  const [packWeightUnit, setPackWeightUnit] = useState<"kg" | "lb">("kg");
+
+  /** Compute the unit, quantity, and preview unitPrice to pass to the API. */
+  function computeSend(): { unit: string; qty: number; computedUnitPrice: number | null } {
+    const price = flippItem.currentPrice;
+
+    if (unitMode === "auto" && flippItem.unitPrice && flippItem.unit) {
+      // qty = price / unitPrice recovers the canonical pack size (e.g. 0.454 kg)
+      const qty = price / flippItem.unitPrice;
+      return { unit: flippItem.unit, qty, computedUnitPrice: flippItem.unitPrice };
+    }
+
+    if (unitMode === "per kg") {
+      return { unit: "per kg", qty: 1, computedUnitPrice: price };
+    }
+
+    if (unitMode === "per lb") {
+      const qtyKg = 0.453592; // 1 lb in kg
+      return { unit: "per kg", qty: qtyKg, computedUnitPrice: price / qtyKg };
+    }
+
+    if (unitMode === "per pack") {
+      const w = parseFloat(packWeight);
+      if (w > 0) {
+        const qtyKg = packWeightUnit === "kg" ? w : w * 0.453592;
+        return { unit: "per kg", qty: qtyKg, computedUnitPrice: price / qtyKg };
+      }
+      // No weight entered yet
+      return { unit: "per pack", qty: 1, computedUnitPrice: null };
+    }
+
+    // "each"
+    return { unit: "each", qty: 1, computedUnitPrice: null };
+  }
+
+  const { unit, qty, computedUnitPrice } = computeSend();
 
   async function handleAdd() {
     if (!itemName.trim()) { setError("Item name is required"); return; }
@@ -71,36 +110,56 @@ function AddModal({
     }
   }
 
-  const unitLabel = unit.replace("per ", "");
   const validTo = flippItem.validTo
     ? new Date(flippItem.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
     : null;
+
+  const flippSearchUrl = `https://flipp.com/search?q=${encodeURIComponent(flippItem.name)}`;
+
+  const unitModes: { label: string; value: UnitMode }[] = [
+    ...(hasAutoUnit ? [{ label: "Auto-detect", value: "auto" as UnitMode }] : []),
+    { label: "Per kg", value: "per kg" as UnitMode },
+    { label: "Per lb", value: "per lb" as UnitMode },
+    { label: "Per pack", value: "per pack" as UnitMode },
+    { label: "Each", value: "each" as UnitMode },
+  ];
 
   return (
     <>
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
-      {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-w-lg mx-auto">
-        <div className="px-5 pt-5 pb-8 space-y-4">
+      {/* Bottom sheet — capped at 90vh, scrollable */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-w-lg mx-auto max-h-[90vh] flex flex-col">
+        <div className="overflow-y-auto flex-1 px-5 pt-5 pb-8 space-y-4">
           {/* Handle */}
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto" />
 
-          <h2 className="text-lg font-bold text-gray-900">
-            {trackedMatch ? "Update price" : "Track this item"}
-          </h2>
+          {/* Header + Flipp link */}
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="text-lg font-bold text-gray-900">
+              {trackedMatch ? "Update price" : "Track this item"}
+            </h2>
+            <a
+              href={flippSearchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-brand-600 font-medium underline shrink-0 mt-1"
+            >
+              View on Flipp →
+            </a>
+          </div>
 
           {/* Flyer item info (read-only) */}
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-sm">
-            <p className="font-medium text-gray-800 truncate">{flippItem.name}</p>
+            <p className="font-medium text-gray-800">{flippItem.name}</p>
             <p className="text-gray-500 mt-0.5">{flippItem.merchantName}</p>
             <div className="flex items-center justify-between mt-2">
               <span className="text-xl font-bold text-orange-700">
                 ${flippItem.currentPrice.toFixed(2)}
-                {flippItem.unitPrice && (
+                {flippItem.unitPrice && flippItem.unit && (
                   <span className="text-sm font-normal text-gray-500 ml-1">
-                    (${flippItem.unitPrice.toFixed(2)}/{unitLabel})
+                    (${flippItem.unitPrice.toFixed(2)}/{flippItem.unit.replace("per ", "")})
                   </span>
                 )}
               </span>
@@ -111,6 +170,77 @@ function AddModal({
             )}
           </div>
 
+          {/* Unit mode selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Price is listed…
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {unitModes.map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => setUnitMode(m.value)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    unitMode === m.value
+                      ? "bg-brand-600 text-white border-brand-600"
+                      : "bg-white text-gray-600 border-gray-300"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Per pack — weight entry + live per-kg preview */}
+          {unitMode === "per pack" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+              <p className="text-xs text-blue-700 font-medium">
+                Enter pack weight to calculate price per kg
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={packWeight}
+                  onChange={(e) => setPackWeight(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <select
+                  value={packWeightUnit}
+                  onChange={(e) => setPackWeightUnit(e.target.value as "kg" | "lb")}
+                  className="px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="kg">kg</option>
+                  <option value="lb">lb</option>
+                </select>
+              </div>
+              {computedUnitPrice ? (
+                <p className="text-sm font-semibold text-blue-800">
+                  = ${computedUnitPrice.toFixed(2)} / kg
+                </p>
+              ) : (
+                <p className="text-xs text-blue-500">Enter weight above to see per-kg price</p>
+              )}
+            </div>
+          )}
+
+          {/* Unit price preview for per kg / per lb modes */}
+          {(unitMode === "per kg" || unitMode === "per lb") && computedUnitPrice && (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              <p className="text-xs text-gray-500">
+                Recorded as{" "}
+                <span className="font-semibold text-gray-800">
+                  ${computedUnitPrice.toFixed(2)} / kg
+                </span>
+                {unitMode === "per lb" && (
+                  <span className="text-gray-400"> (converted from /lb)</span>
+                )}
+              </p>
+            </div>
+          )}
+
           {/* Item name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -118,8 +248,10 @@ function AddModal({
             </label>
             {trackedMatch ? (
               <div className="flex items-center gap-2">
-                <Link href={`/item/${trackedMatch.id}`}
-                  className="flex-1 px-3 py-2.5 bg-gray-100 rounded-xl text-sm font-medium text-brand-700 truncate">
+                <Link
+                  href={`/item/${trackedMatch.id}`}
+                  className="flex-1 px-3 py-2.5 bg-gray-100 rounded-xl text-sm font-medium text-brand-700 truncate"
+                >
                   {trackedMatch.name} →
                 </Link>
                 <span className="text-xs text-gray-400 shrink-0">existing item</span>
