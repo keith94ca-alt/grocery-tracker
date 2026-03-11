@@ -56,7 +56,6 @@ export default function SearchPage() {
   const [itemsLoading, setItemsLoading] = useState(true);
   const [dealsMap, setDealsMap] = useState<Map<number, DealResult>>(new Map());
 
-  // Load tracked items
   useEffect(() => {
     fetch("/api/items?stats=true")
       .then((r) => r.json())
@@ -65,7 +64,6 @@ export default function SearchPage() {
       .finally(() => setItemsLoading(false));
   }, []);
 
-  // Load flyer deals in the background after items load
   useEffect(() => {
     if (itemsLoading) return;
     fetch("/api/flyer-deals")
@@ -98,7 +96,13 @@ export default function SearchPage() {
     return () => clearTimeout(timer);
   }, [query, search]);
 
-  const flyerDeals = Array.from(dealsMap.values()).filter((d) => d.isOnFlyer);
+  // Only show deals worth acting on:
+  // - Green: confirmed cheaper (unit price comparison)
+  // - Orange: advertised sale but can't compare units
+  // - Hidden: no deal signal, or confirmed more expensive
+  const flyerDeals = Array.from(dealsMap.values()).filter(
+    (d) => d.isCheaper || (d.isOnFlyer && !!d.bestDeal.saleStory)
+  );
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -173,48 +177,75 @@ export default function SearchPage() {
           {/* ── Flyer Deals This Week ── */}
           {flyerDeals.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-orange-600 uppercase tracking-wide flex items-center gap-1.5">
+              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
                 🏷️ Flyer deals this week
               </h2>
-              {flyerDeals.map((deal) => (
-                <Link key={deal.itemId} href={`/item/${deal.itemId}`}
-                  className="block bg-orange-50 border border-orange-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900">{deal.itemName}</p>
-                      <p className="text-xs text-gray-600 mt-0.5 truncate">
-                        {deal.bestDeal.name} · {deal.bestDeal.merchantName}
-                      </p>
-                      {deal.bestDeal.saleStory && (
-                        <p className="text-xs text-orange-600 font-medium mt-0.5">{deal.bestDeal.saleStory}</p>
-                      )}
-                    </div>
-                    <div className="text-right ml-3 shrink-0">
-                      <p className="text-lg font-bold text-orange-700">
-                        ${deal.bestDeal.currentPrice.toFixed(2)}
-                        {deal.bestDeal.unitPrice && deal.bestDeal.unit && (
-                          <span className="text-xs font-normal text-gray-500">
-                            {" "}· ${deal.bestDeal.unitPrice.toFixed(2)}/{deal.bestDeal.unit.replace("per ", "")}
-                          </span>
+              {flyerDeals.map((deal) => {
+                const isGood = deal.isCheaper;
+                // Only show "Your last" if we can make a meaningful unit comparison
+                const unitsComparable = !!(
+                  deal.latestUnitPrice !== null &&
+                  deal.latestUnit &&
+                  deal.bestDeal.unit &&
+                  deal.latestUnit === deal.bestDeal.unit
+                );
+                return (
+                  <Link key={deal.itemId} href={`/item/${deal.itemId}`}
+                    className={`block rounded-xl border p-4 hover:shadow-md transition-shadow ${
+                      isGood
+                        ? "bg-green-50 border-green-200"
+                        : "bg-orange-50 border-orange-200"
+                    }`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900">{deal.itemName}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">
+                          {deal.bestDeal.name} · {deal.bestDeal.merchantName}
+                        </p>
+                        {deal.bestDeal.saleStory && (
+                          <p className={`text-xs font-medium mt-0.5 ${isGood ? "text-green-700" : "text-orange-600"}`}>
+                            {deal.bestDeal.saleStory}
+                          </p>
                         )}
+                      </div>
+                      <div className="text-right ml-3 shrink-0">
+                        <p className={`text-lg font-bold ${isGood ? "text-green-700" : "text-orange-700"}`}>
+                          ${deal.bestDeal.currentPrice.toFixed(2)}
+                          {deal.bestDeal.unitPrice && deal.bestDeal.unit && (
+                            <span className="text-xs font-normal text-gray-500">
+                              {" "}· ${deal.bestDeal.unitPrice.toFixed(2)}/{deal.bestDeal.unit.replace("per ", "")}
+                            </span>
+                          )}
+                        </p>
+                        {isGood && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
+                          <span className="text-xs font-bold text-green-600">Save {deal.savingsPercent}%</span>
+                        ) : !isGood ? (
+                          <span className="text-xs font-semibold text-orange-500">On Sale</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    {/* Only show price comparison when units are actually comparable */}
+                    {unitsComparable && (
+                      <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs text-gray-500 ${
+                        isGood ? "border-green-100" : "border-orange-100"
+                      }`}>
+                        <span>Your last: <strong>${deal.latestUnitPrice!.toFixed(2)}/{deal.latestUnit!.replace("per ", "")}</strong></span>
+                        {deal.bestDeal.validTo && (
+                          <span>Until {formatValidTo(deal.bestDeal.validTo)}</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Show expiry even without price comparison */}
+                    {!unitsComparable && deal.bestDeal.validTo && (
+                      <p className={`mt-2 pt-2 border-t text-xs text-right text-gray-400 ${
+                        isGood ? "border-green-100" : "border-orange-100"
+                      }`}>
+                        Until {formatValidTo(deal.bestDeal.validTo)}
                       </p>
-                      {deal.isCheaper && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
-                        <span className="text-xs font-semibold text-green-600">Save {deal.savingsPercent}%</span>
-                      ) : !deal.isCheaper && deal.bestDeal.saleStory ? (
-                        <span className="text-xs font-semibold text-orange-600">On Sale</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  {deal.latestUnitPrice !== null && (
-                    <div className="mt-2 pt-2 border-t border-orange-100 flex items-center justify-between text-xs text-gray-500">
-                      <span>Your last: <strong>${deal.latestUnitPrice.toFixed(2)}/{deal.latestUnit?.replace("per ", "")}</strong></span>
-                      {deal.bestDeal.validTo && (
-                        <span>Until {formatValidTo(deal.bestDeal.validTo)}</span>
-                      )}
-                    </div>
-                  )}
-                </Link>
-              ))}
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           )}
 
@@ -243,19 +274,29 @@ export default function SearchPage() {
             ) : (
               items.map((item) => {
                 const deal = dealsMap.get(item.id);
-                const hasSale = deal?.isOnFlyer === true;
+                // Only highlight if it's a confirmed deal or advertised sale
+                const hasDeal = !!(deal?.isCheaper || (deal?.isOnFlyer && deal.bestDeal.saleStory));
+                const isGoodDeal = deal?.isCheaper === true;
                 return (
                   <Link key={item.id} href={`/item/${item.id}`}
                     className={`block bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
-                      hasSale ? "border-orange-200" : "border-gray-200"
+                      isGoodDeal ? "border-green-200" :
+                      hasDeal ? "border-orange-200" :
+                      "border-gray-200"
                     }`}>
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-gray-900">{item.name}</p>
-                          {hasSale && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-semibold">
-                              🏷️ {deal?.isCheaper ? "On Sale" : "On Flyer"}
+                          {hasDeal && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              isGoodDeal
+                                ? "bg-green-100 text-green-700"
+                                : "bg-orange-100 text-orange-700"
+                            }`}>
+                              🏷️ {isGoodDeal
+                                ? (deal!.savingsPercent ? `Save ${deal!.savingsPercent}%` : "On Sale")
+                                : "On Flyer"}
                             </span>
                           )}
                         </div>
@@ -287,19 +328,21 @@ export default function SearchPage() {
                       </div>
                     )}
 
-                    {/* Flyer deal teaser on card */}
-                    {hasSale && deal && (
-                      <div className="mt-2 pt-2 border-t border-orange-100 flex items-center justify-between text-xs">
-                        <span className="text-orange-700 font-medium truncate">
+                    {/* Flyer deal teaser — color matches deal quality */}
+                    {hasDeal && deal && (
+                      <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs ${
+                        isGoodDeal ? "border-green-100" : "border-orange-100"
+                      }`}>
+                        <span className={`font-medium truncate ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
                           {deal.bestDeal.merchantName} · ${deal.bestDeal.currentPrice.toFixed(2)}
                           {deal.bestDeal.unitPrice && deal.bestDeal.unit
-                            ? `/${deal.bestDeal.unit.replace("per ", "")}`
+                            ? ` · $${deal.bestDeal.unitPrice.toFixed(2)}/${deal.bestDeal.unit.replace("per ", "")}`
                             : ""}
                         </span>
-                        {deal.isCheaper && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
-                          <span className="text-green-600 font-semibold shrink-0 ml-2">Save {deal.savingsPercent}%</span>
+                        {isGoodDeal && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
+                          <span className="text-green-600 font-bold shrink-0 ml-2">↓{deal.savingsPercent}%</span>
                         ) : deal.bestDeal.saleStory ? (
-                          <span className="text-orange-600 font-semibold shrink-0 ml-2">On Sale</span>
+                          <span className="text-orange-600 font-semibold shrink-0 ml-2">Sale</span>
                         ) : null}
                       </div>
                     )}

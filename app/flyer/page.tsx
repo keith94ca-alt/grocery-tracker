@@ -127,10 +127,10 @@ function AddModal({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
 
       {/* Bottom sheet — capped at 90vh, scrollable */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl max-w-lg mx-auto max-h-[90vh] flex flex-col">
+      <div className="fixed bottom-0 left-0 right-0 z-[70] bg-white rounded-t-2xl shadow-2xl max-w-lg mx-auto max-h-[90vh] flex flex-col">
         <div className="overflow-y-auto flex-1 px-5 pt-5 pb-8 space-y-4">
           {/* Handle */}
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto" />
