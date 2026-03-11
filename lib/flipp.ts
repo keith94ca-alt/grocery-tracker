@@ -281,6 +281,8 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
         if (!TARGET_MERCHANTS.some((m) => merchant.includes(m))) return false;
         // Drop items whose flyer has already expired
         if (item.valid_to && new Date(item.valid_to) < now) return false;
+        // Drop percentage-off deals (e.g. "Save up to 25%") — no actual price
+        if (!item.current_price || item.current_price <= 0) return false;
         return true;
       })
       .map((item): FlippItem => {
