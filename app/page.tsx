@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 
@@ -19,6 +19,7 @@ interface ItemSummary {
   name: string;
   category: string;
   unit: string;
+  watched: boolean;
   stats: ItemStat | null;
 }
 
@@ -55,6 +56,7 @@ export default function SearchPage() {
   const [items, setItems] = useState<ItemSummary[]>([]);
   const [itemsLoading, setItemsLoading] = useState(true);
   const [dealsMap, setDealsMap] = useState<Map<number, DealResult>>(new Map());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/items?stats=true")
@@ -96,13 +98,28 @@ export default function SearchPage() {
     return () => clearTimeout(timer);
   }, [query, search]);
 
+  // Distinct categories derived from loaded items (sorted)
+  const categories = useMemo(() => {
+    const cats = new Set(items.map((i) => i.category));
+    return Array.from(cats).sort();
+  }, [items]);
+
+  // Apply category filter client-side
+  const filteredItems = selectedCategory
+    ? items.filter((i) => i.category === selectedCategory)
+    : items;
+  const filteredItemIds = useMemo(
+    () => new Set(filteredItems.map((i) => i.id)),
+    [filteredItems]
+  );
+
   // Only show deals worth acting on:
   // - Green: confirmed cheaper (unit price comparison)
   // - Orange: advertised sale but can't compare units
   // - Hidden: no deal signal, or confirmed more expensive
-  const flyerDeals = Array.from(dealsMap.values()).filter(
-    (d) => d.isCheaper || (d.isOnFlyer && !!d.bestDeal.saleStory)
-  );
+  const flyerDeals = Array.from(dealsMap.values())
+    .filter((d) => d.isCheaper || (d.isOnFlyer && !!d.bestDeal.saleStory))
+    .filter((d) => filteredItemIds.has(d.itemId));
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -119,6 +136,35 @@ export default function SearchPage() {
         />
         {loading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin">⟳</span>}
       </div>
+
+      {/* Category filter chips — only show when not searching and there are multiple categories */}
+      {!query.trim() && categories.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              selectedCategory === null
+                ? "bg-brand-600 text-white border-brand-600"
+                : "bg-white text-gray-600 border-gray-300"
+            }`}
+          >
+            All
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                selectedCategory === cat
+                  ? "bg-brand-600 text-white border-brand-600"
+                  : "bg-white text-gray-600 border-gray-300"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
 
       {query.trim() ? (
         /* ── Search results ── */
@@ -254,7 +300,7 @@ export default function SearchPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-                Your items {!itemsLoading && items.length > 0 && `(${items.length})`}
+                Your items {!itemsLoading && filteredItems.length > 0 && `(${filteredItems.length})`}
               </h2>
               <Link href="/history" className="text-sm text-brand-600 font-medium">All entries →</Link>
             </div>
@@ -263,21 +309,78 @@ export default function SearchPage() {
               <div className="text-center py-8 text-gray-400">
                 <div className="text-4xl animate-pulse">⏳</div>
               </div>
-            ) : items.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <p className="text-5xl mb-3">🛒</p>
-                <p className="font-medium text-gray-600">No prices yet</p>
-                <p className="text-sm mt-1">Add your first price entry to get started</p>
-                <Link href="/add" className="mt-4 inline-block px-6 py-3 bg-brand-600 text-white rounded-xl font-medium shadow-sm">
-                  Add first item
-                </Link>
-              </div>
+            ) : filteredItems.length === 0 ? (
+              selectedCategory ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-4xl mb-2">📂</p>
+                  <p className="font-medium text-gray-600">No {selectedCategory} items yet</p>
+                  <button onClick={() => setSelectedCategory(null)} className="mt-2 text-sm text-brand-600 font-medium">
+                    Show all categories
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-400">
+                  <p className="text-5xl mb-3">🛒</p>
+                  <p className="font-medium text-gray-600">No prices yet</p>
+                  <p className="text-sm mt-1">Add your first price entry to get started</p>
+                  <Link href="/add" className="mt-4 inline-block px-6 py-3 bg-brand-600 text-white rounded-xl font-medium shadow-sm">
+                    Add first item
+                  </Link>
+                </div>
+              )
             ) : (
-              items.map((item) => {
+              filteredItems.map((item) => {
                 const deal = dealsMap.get(item.id);
                 // Only highlight if it's a confirmed deal or advertised sale
                 const hasDeal = !!(deal?.isCheaper || (deal?.isOnFlyer && deal.bestDeal.saleStory));
                 const isGoodDeal = deal?.isCheaper === true;
+                // Watched item with no price history yet
+                const isWatchOnly = item.watched && !item.stats;
+
+                if (isWatchOnly) {
+                  return (
+                    <Link key={item.id} href={`/item/${item.id}`}
+                      className={`block bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
+                        hasDeal ? (isGoodDeal ? "border-green-200" : "border-orange-200") : "border-gray-200 border-dashed"
+                      }`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-gray-900">{item.name}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">⭐ Watching</span>
+                            {hasDeal && (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                isGoodDeal ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+                              }`}>
+                                🏷️ On Flyer
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-0.5">{item.category} · No prices yet</p>
+                        </div>
+                        {hasDeal && deal && (
+                          <div className="text-right ml-3 shrink-0">
+                            <p className={`text-lg font-bold ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
+                              ${deal.bestDeal.currentPrice.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-400">{deal.bestDeal.merchantName}</p>
+                          </div>
+                        )}
+                      </div>
+                      {hasDeal && deal && (
+                        <div className={`mt-2 pt-2 border-t text-xs ${isGoodDeal ? "border-green-100" : "border-orange-100"}`}>
+                          <p className={`font-medium ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
+                            {deal.bestDeal.saleStory || "On sale this week"}
+                          </p>
+                          <Link href="/add" className="mt-1 inline-block text-brand-600 font-medium">
+                            + Log price →
+                          </Link>
+                        </div>
+                      )}
+                    </Link>
+                  );
+                }
+
                 return (
                   <Link key={item.id} href={`/item/${item.id}`}
                     className={`block bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
@@ -289,6 +392,7 @@ export default function SearchPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-semibold text-gray-900">{item.name}</p>
+                          {item.watched && <span className="text-xs text-gray-400">⭐</span>}
                           {hasDeal && (
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
                               isGoodDeal

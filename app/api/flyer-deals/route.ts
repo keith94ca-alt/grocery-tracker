@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const items = await prisma.item.findMany({
       where: itemIdParam
         ? { id: parseInt(itemIdParam) }
-        : { priceEntries: { some: {} } },
+        : { OR: [{ priceEntries: { some: {} } }, { watched: true }] },
       include: {
         priceEntries: {
           orderBy: { date: "desc" },
@@ -96,8 +96,12 @@ export async function GET(request: NextRequest) {
           ? withUnit.reduce((a, b) => (a.unitPrice! < b.unitPrice! ? a : b))
           : matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
       }
-      const flyerNorm = best.unitPrice && best.unit
+      // If the Flipp item has no unit price (e.g. variable-weight items showing
+      // a sale story instead), fall back to the manually-entered unit price.
+      const flyerNorm = (best.unitPrice && best.unit)
         ? normalizePrice(best.unitPrice, best.unit)
+        : recentFlyerEntry
+        ? normalizePrice(recentFlyerEntry.unitPrice, recentFlyerEntry.unit || item.unit)
         : null;
 
       let isCheaper = false;

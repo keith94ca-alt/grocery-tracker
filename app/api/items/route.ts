@@ -9,9 +9,9 @@ export async function GET(request: NextRequest) {
 
   try {
     if (withStats) {
-      // Home page: all items with at least one entry, with normalized stats
+      // Home page: items with at least one entry OR that are watched (watchlist)
       const items = await prisma.item.findMany({
-        where: { priceEntries: { some: {} } },
+        where: { OR: [{ priceEntries: { some: {} } }, { watched: true }] },
         orderBy: { name: "asc" },
         include: {
           priceEntries: {
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
                 }
               : null;
 
-          return { id: item.id, name: item.name, category: item.category, unit: item.unit, stats };
+          return { id: item.id, name: item.name, category: item.category, unit: item.unit, watched: item.watched, stats };
         })
         // Sort by most recently updated first
         .sort((a, b) => {

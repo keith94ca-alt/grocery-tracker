@@ -54,6 +54,52 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const id = parseInt(params.id);
+  if (isNaN(id)) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  }
+
+  try {
+    const body = await request.json();
+    const { name, category, unit, watched } = body as {
+      name?: string;
+      category?: string;
+      unit?: string;
+      watched?: boolean;
+    };
+
+    // Build partial update — only include fields that were provided
+    const data: Record<string, unknown> = {};
+    if (name !== undefined) data.name = name.trim();
+    if (category !== undefined) data.category = category;
+    if (unit !== undefined) data.unit = unit;
+    if (watched !== undefined) data.watched = watched;
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const item = await prisma.item.update({ where: { id }, data });
+    return NextResponse.json(item);
+  } catch (error: unknown) {
+    // Prisma unique constraint violation (P2002) = name already taken
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code: string }).code === "P2002"
+    ) {
+      return NextResponse.json({ error: "An item with that name already exists" }, { status: 409 });
+    }
+    console.error("PATCH /api/items/[id] error:", error);
+    return NextResponse.json({ error: "Failed to update item" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: { id: string } }

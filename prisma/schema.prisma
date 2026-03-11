@@ -13,6 +13,7 @@ model Item {
   name         String       @unique
   category     String       @default("Other")
   unit         String       @default("each")
+  watched      Boolean      @default(false)
   createdAt    DateTime     @default(now())
   priceEntries PriceEntry[]
 }
