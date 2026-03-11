@@ -129,10 +129,11 @@ function AddModal({
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
 
-      {/* Bottom sheet — capped at 90vh, scrollable */}
-      <div className="fixed bottom-0 left-0 right-0 z-[70] bg-white rounded-t-2xl shadow-2xl max-w-lg mx-auto max-h-[90vh] flex flex-col">
+      {/* Centered modal */}
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="overflow-y-auto flex-1 px-5 pt-5 pb-8 space-y-4">
-          {/* Handle */}
+          {/* Drag handle placeholder keeps spacing consistent */}
           <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto" />
 
           {/* Header + Flipp link */}
@@ -301,6 +302,7 @@ function AddModal({
             </button>
           </div>
         </div>
+        </div>
       </div>
     </>
   );
@@ -370,7 +372,14 @@ export default function FlyerPage() {
   const [filter, setFilter] = useState("");
   const [storeFilter, setStoreFilter] = useState("All");
   const [modal, setModal] = useState<ModalState | null>(null);
-  const [added, setAdded] = useState<Set<number>>(new Set());
+  const [added, setAdded] = useState<Set<number>>(() => {
+    try {
+      const raw = sessionStorage.getItem("flyer-added");
+      return new Set(JSON.parse(raw ?? "[]") as number[]);
+    } catch {
+      return new Set();
+    }
+  });
 
   useEffect(() => {
     fetch("/api/flyer-items")
@@ -389,6 +398,7 @@ export default function FlyerPage() {
   const trackedItems = items.filter((i) => i.trackedMatch);
 
   const displayed = (tab === "new" ? newItems : trackedItems).filter((i) => {
+    if (added.has(i.flippItem.id)) return false;
     const matchesStore = storeFilter === "All" || i.flippItem.merchantName === storeFilter;
     const matchesFilter =
       !filter ||
@@ -398,7 +408,11 @@ export default function FlyerPage() {
   });
 
   function handleAdded(flippId: number, itemName: string) {
-    setAdded((prev) => new Set(prev).add(flippId));
+    setAdded((prev) => {
+      const next = new Set(prev).add(flippId);
+      try { sessionStorage.setItem("flyer-added", JSON.stringify([...next])); } catch {}
+      return next;
+    });
     setModal(null);
     // If we just added a new item, move it to "tracked" tab next time
     setItems((prev) =>

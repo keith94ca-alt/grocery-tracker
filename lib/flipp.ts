@@ -53,12 +53,20 @@ const TARGET_MERCHANTS = [
   "t&t",
 ];
 
-/** Broad food categories searched when browsing this week's flyers */
+/** Broad categories searched when browsing this week's flyers */
 const FLYER_CATEGORIES = [
+  // Meat & protein
   "beef", "chicken", "pork", "fish", "turkey", "bacon", "ham", "sausage",
+  // Dairy & eggs
   "milk", "butter", "cheese", "eggs", "yogurt",
+  // Pantry & bakery
   "bread", "pasta", "rice", "cereal",
+  // Produce & beverages
   "apples", "bananas", "vegetables", "coffee", "juice",
+  // Personal care
+  "body wash", "shampoo", "conditioner", "deodorant", "toothpaste",
+  // Household & cleaning
+  "laundry detergent", "dish soap", "toilet paper", "paper towel", "bleach",
 ];
 
 export interface FlippItem {
