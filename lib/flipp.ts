@@ -101,6 +101,54 @@ function parseSize(name: string): { qty: number; unit: string } | null {
 }
 
 /**
+ * Parse a per-unit price from Flipp's `price_text` field.
+ * Canadian flyers commonly list "$2.99/lb", "$14.44/kg", "$0.99/100g" etc.
+ * All weight units are normalised to per kg; volume to per L.
+ *
+ * e.g. "$2.99/lb"   → { unitPrice: 6.60, unit: "per kg" }
+ * e.g. "$14.44/kg"  → { unitPrice: 14.44, unit: "per kg" }
+ * e.g. "$0.99/100g" → { unitPrice: 9.90,  unit: "per kg" }
+ * e.g. "$2.99"      → null  (no unit info)
+ * e.g. "2/$5.00"    → null  (multi-buy, can't determine unit)
+ */
+function parsePriceText(
+  priceText: string | null | undefined
+): { unitPrice: number; unit: string } | null {
+  if (!priceText) return null;
+
+  // Match patterns like "$2.99/lb", "2.99 / kg", "$0.99/100g", "$1.49/100mL"
+  const m = priceText.match(
+    /\$?\s*(\d+(?:\.\d+)?)\s*\/\s*(lb|lbs?|kg|100\s*g|g(?!al)|L(?!b)|100\s*mL|mL)/i
+  );
+  if (!m) return null;
+
+  const price = parseFloat(m[1]);
+  const rawUnit = m[2].replace(/\s+/g, "").toLowerCase();
+
+  if (!price || price <= 0) return null;
+
+  switch (rawUnit) {
+    case "lb":
+    case "lbs":
+      return { unitPrice: price / 0.453592, unit: "per kg" };
+    case "kg":
+      return { unitPrice: price, unit: "per kg" };
+    case "100g":
+      return { unitPrice: price * 10, unit: "per kg" };
+    case "g":
+      return { unitPrice: price * 1000, unit: "per kg" };
+    case "l":
+      return { unitPrice: price, unit: "per L" };
+    case "100ml":
+      return { unitPrice: price * 10, unit: "per L" };
+    case "ml":
+      return { unitPrice: price * 1000, unit: "per L" };
+    default:
+      return null;
+  }
+}
+
+/**
  * Strip size/quantity suffixes to produce a clean tracking name.
  * "Extra Lean Ground Beef 454 g" → "Extra Lean Ground Beef"
  */
@@ -222,19 +270,34 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
         return TARGET_MERCHANTS.some((m) => merchant.includes(m));
       })
       .map((item): FlippItem => {
+        const currentPrice: number = item.current_price ?? 0;
+
+        // 1st choice: size token in the product name (most reliable)
+        //   e.g. "Extra Lean Ground Beef 454 g"
         const size = parseSize(item.name ?? "");
+
+        // 2nd choice: Flipp's price_text field
+        //   e.g. "$2.99/lb", "$14.44/kg", "$0.99/100g"
+        const fromPriceText = size ? null : parsePriceText(item.price_text);
+
+        const unitPrice = size
+          ? currentPrice / size.qty
+          : fromPriceText?.unitPrice ?? null;
+
+        const unit = size?.unit ?? fromPriceText?.unit ?? null;
+
         return {
           id: item.id,
           name: item.name ?? "",
-          currentPrice: item.current_price ?? 0,
+          currentPrice,
           originalPrice: item.original_price ?? null,
           merchantName: item.merchant_name ?? "",
           saleStory: item.sale_story ?? null,
           validFrom: item.valid_from ?? "",
           validTo: item.valid_to ?? "",
           imageUrl: item.clean_image_url ?? null,
-          unitPrice: size ? item.current_price / size.qty : null,
-          unit: size?.unit ?? null,
+          unitPrice,
+          unit,
         };
       });
   } catch {

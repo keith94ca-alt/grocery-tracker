@@ -61,23 +61,42 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
 }
 
 function FlyerDealBanner({ deal }: { deal: DealResult }) {
-  const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper } = deal;
-  const hasUnitPrice = bestDeal.unitPrice != null && bestDeal.unit != null;
-  const unit = bestDeal.unit?.replace("per ", "") ?? "";
+  const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
+          flyerUnitPrice, flyerUnit } = deal;
   const validTo = bestDeal.validTo
     ? new Date(bestDeal.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
     : null;
+  const flippSearchUrl = `https://flipp.com/search?q=${encodeURIComponent(bestDeal.name)}`;
+
+  // Colour scheme: green = confirmed cheaper, orange = on sale / can't compare, gray = unknown
+  const colour = isCheaper
+    ? { bg: "bg-green-50", border: "border-green-200", heading: "text-green-800",
+        price: "text-green-700", divider: "border-green-100" }
+    : bestDeal.saleStory
+    ? { bg: "bg-orange-50", border: "border-orange-200", heading: "text-orange-800",
+        price: "text-orange-700", divider: "border-orange-100" }
+    : { bg: "bg-gray-50", border: "border-gray-200", heading: "text-gray-700",
+        price: "text-gray-800", divider: "border-gray-100" };
+
+  const canCompare = flyerUnitPrice !== null && latestUnitPrice !== null && flyerUnit === latestUnit;
 
   return (
-    <div className={`rounded-xl border p-4 ${isCheaper
-      ? "bg-orange-50 border-orange-200"
-      : "bg-gray-50 border-gray-200"
-    }`}>
+    <div className={`rounded-xl border p-4 ${colour.bg} ${colour.border}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold flex items-center gap-1.5 ${isCheaper ? "text-orange-800" : "text-gray-700"}`}>
-            🏷️ {isCheaper ? "On Sale This Week!" : "On Flyer This Week"}
-          </p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className={`text-sm font-bold ${colour.heading}`}>
+              🏷️ {isCheaper ? "On Sale This Week!" : "On Flyer This Week"}
+            </p>
+            <a
+              href={flippSearchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-brand-600 underline font-medium"
+            >
+              View on Flipp →
+            </a>
+          </div>
           <p className="text-sm text-gray-700 mt-1 font-medium truncate">{bestDeal.name}</p>
           <p className="text-xs text-gray-500 mt-0.5">{bestDeal.merchantName}</p>
           {bestDeal.saleStory && (
@@ -85,39 +104,41 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
           )}
         </div>
         <div className="text-right shrink-0">
-          <p className={`text-xl font-bold ${isCheaper ? "text-orange-700" : "text-gray-800"}`}>
+          <p className={`text-xl font-bold ${colour.price}`}>
             ${bestDeal.currentPrice.toFixed(2)}
           </p>
-          {hasUnitPrice && (
-            <p className="text-xs text-gray-500">
-              ${bestDeal.unitPrice!.toFixed(2)}/{unit}
+          {/* Show the normalised per-kg/L price if we have it */}
+          {flyerUnitPrice !== null && flyerUnit && (
+            <p className="text-xs text-gray-500 font-medium">
+              ${flyerUnitPrice.toFixed(2)}/{flyerUnit.replace("per ", "")}
             </p>
           )}
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-orange-100 flex items-center justify-between text-xs flex-wrap gap-2">
-        <div className="flex gap-3">
-          {latestUnitPrice !== null && (
+      <div className={`mt-3 pt-3 border-t ${colour.divider} flex items-center justify-between text-xs flex-wrap gap-2`}>
+        <div className="flex gap-3 flex-wrap">
+          {canCompare && (
             <span className="text-gray-500">
-              Your last: <strong className="text-gray-700">
-                ${latestUnitPrice.toFixed(2)}/{latestUnit?.replace("per ", "")}
+              Your last:{" "}
+              <strong className="text-gray-700">
+                ${latestUnitPrice!.toFixed(2)}/{latestUnit!.replace("per ", "")}
               </strong>
             </span>
           )}
           {isCheaper && savingsPercent !== null && savingsPercent > 0 && (
-            <span className="text-green-600 font-semibold">Save {savingsPercent}%</span>
+            <span className="text-green-600 font-bold">Save {savingsPercent}%</span>
           )}
-          {!isCheaper && latestUnitPrice !== null && hasUnitPrice && (
-            <span className="text-gray-400">(Above your tracked price)</span>
+          {!isCheaper && canCompare && (
+            <span className="text-gray-400">Above your tracked price</span>
           )}
-          {!hasUnitPrice && (
-            <span className="text-gray-400">Open Flyer tab to log price per kg</span>
+          {flyerUnitPrice === null && (
+            <span className="text-gray-400">
+              Unit price unknown — open Flyer tab to log weight
+            </span>
           )}
         </div>
-        {validTo && (
-          <span className="text-gray-400">Valid until {validTo}</span>
-        )}
+        {validTo && <span className="text-gray-400">Valid until {validTo}</span>}
       </div>
     </div>
   );

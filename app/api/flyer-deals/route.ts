@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchFlyerBrowse, matchesTrackedItem, FlippItem } from "@/lib/flipp";
-import { normalizePrice } from "@/lib/units";
+import { normalizePrice, sameUnitGroup } from "@/lib/units";
 
 const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "N2B3J1";
 
 export interface DealResult {
   itemId: number;
   itemName: string;
-  latestUnitPrice: number | null; // normalized canonical unit price (e.g. per kg)
-  latestUnit: string | null;
-  bestDeal: FlippItem;            // best matching flyer item
+  latestUnitPrice: number | null;    // your last tracked price, normalized to canonical unit
+  latestUnit: string | null;         // canonical unit for tracked price (e.g. "per kg")
+  bestDeal: FlippItem;               // best matching flyer item (raw Flipp data)
+  flyerUnitPrice: number | null;     // flyer price normalized to same canonical unit
+  flyerUnit: string | null;          // canonical unit for flyer price
   allDeals: FlippItem[];
-  savingsPercent: number | null;  // positive = you save vs latest tracked price
-  isCheaper: boolean;             // true when flyer unit price < latest tracked price (unit prices available)
-  isOnFlyer: boolean;             // true whenever ANY flyer match is found (even without unit prices)
+  savingsPercent: number | null;     // how much cheaper vs your last tracked price
+  isCheaper: boolean;                // true when flyer unit price < latest tracked price
+  isOnFlyer: boolean;                // true whenever ANY flyer match found
 }
 
 export async function GET(request: NextRequest) {
@@ -52,19 +54,27 @@ export async function GET(request: NextRequest) {
           ? withUnit.reduce((a, b) => (a.unitPrice! < b.unitPrice! ? a : b))
           : matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
 
-      // Compare against latest tracked price (when both have compatible units)
+      // Normalize both the flyer price and the latest tracked price to their
+      // canonical units (per kg, per L) so lb/kg comparisons work correctly.
       const latest = item.priceEntries[0];
       const latestNorm = latest
         ? normalizePrice(latest.unitPrice, latest.unit || item.unit)
+        : null;
+      const flyerNorm = best.unitPrice && best.unit
+        ? normalizePrice(best.unitPrice, best.unit)
         : null;
 
       let isCheaper = false;
       let savingsPercent: number | null = null;
 
-      if (best.unitPrice && latestNorm?.price && best.unit === latestNorm.unit) {
-        isCheaper = best.unitPrice < latestNorm.price;
+      if (
+        flyerNorm &&
+        latestNorm &&
+        sameUnitGroup(flyerNorm.unit, latestNorm.unit)
+      ) {
+        isCheaper = flyerNorm.price < latestNorm.price;
         if (isCheaper) {
-          savingsPercent = Math.round((1 - best.unitPrice / latestNorm.price) * 100);
+          savingsPercent = Math.round((1 - flyerNorm.price / latestNorm.price) * 100);
         }
       }
 
@@ -74,6 +84,8 @@ export async function GET(request: NextRequest) {
         latestUnitPrice: latestNorm?.price ?? null,
         latestUnit: latestNorm?.unit ?? null,
         bestDeal: best,
+        flyerUnitPrice: flyerNorm?.price ?? null,
+        flyerUnit: flyerNorm?.unit ?? null,
         allDeals: withUnit.length > 0 ? withUnit : matches,
         savingsPercent,
         isCheaper,

@@ -182,12 +182,12 @@ export default function SearchPage() {
               </h2>
               {flyerDeals.map((deal) => {
                 const isGood = deal.isCheaper;
-                // Only show "Your last" if we can make a meaningful unit comparison
+                // Only show "Your last" if both are normalised to the same canonical unit
                 const unitsComparable = !!(
                   deal.latestUnitPrice !== null &&
                   deal.latestUnit &&
-                  deal.bestDeal.unit &&
-                  deal.latestUnit === deal.bestDeal.unit
+                  deal.flyerUnitPrice !== null &&
+                  deal.flyerUnit === deal.latestUnit
                 );
                 return (
                   <Link key={deal.itemId} href={`/item/${deal.itemId}`}
@@ -211,12 +211,13 @@ export default function SearchPage() {
                       <div className="text-right ml-3 shrink-0">
                         <p className={`text-lg font-bold ${isGood ? "text-green-700" : "text-orange-700"}`}>
                           ${deal.bestDeal.currentPrice.toFixed(2)}
-                          {deal.bestDeal.unitPrice && deal.bestDeal.unit && (
-                            <span className="text-xs font-normal text-gray-500">
-                              {" "}· ${deal.bestDeal.unitPrice.toFixed(2)}/{deal.bestDeal.unit.replace("per ", "")}
-                            </span>
-                          )}
                         </p>
+                        {/* Show normalised per-kg/L price when available */}
+                        {deal.flyerUnitPrice !== null && deal.flyerUnit && (
+                          <p className="text-xs text-gray-500">
+                            ${deal.flyerUnitPrice.toFixed(2)}/{deal.flyerUnit.replace("per ", "")}
+                          </p>
+                        )}
                         {isGood && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
                           <span className="text-xs font-bold text-green-600">Save {deal.savingsPercent}%</span>
                         ) : !isGood ? (
