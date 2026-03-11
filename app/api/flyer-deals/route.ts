@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       include: {
         priceEntries: {
           orderBy: { date: "desc" },
-          take: 1,
-          select: { unitPrice: true, unit: true },
+          take: 10,
+          select: { id: true, unitPrice: true, unit: true, source: true, store: true, date: true, price: true },
         },
       },
     });
@@ -47,19 +47,55 @@ export async function GET(request: NextRequest) {
       const matches = flyerItems.filter((fi) => matchesTrackedItem(fi.name, item.name));
       if (matches.length === 0) continue;
 
+      // Use most recent non-flyer entry as the comparison baseline so we're
+      // comparing "flyer deal" vs "what you normally pay", not flyer vs flyer.
+      const latestNonFlyer = item.priceEntries.find((e) => e.source !== "flyer")
+        ?? item.priceEntries[0];
+      const latestNorm = latestNonFlyer
+        ? normalizePrice(latestNonFlyer.unitPrice, latestNonFlyer.unit || item.unit)
+        : null;
+
+      // If the user recently manually logged a flyer price, prefer showing that
+      // store's deal rather than the auto-detected cheapest.
+      const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const recentFlyerEntry = item.priceEntries.find(
+        (e) => e.source === "flyer" && new Date(e.date) >= twoWeeksAgo
+      ) ?? null;
+
       // Prefer items with a parseable unit price; fall back to cheapest raw price
       const withUnit = matches.filter((fi) => fi.unitPrice !== null);
-      const best =
-        withUnit.length > 0
+
+      let best: FlippItem;
+      if (recentFlyerEntry) {
+        // Try to find a Flipp match from the same store the user tracked
+        const storeMatch = matches.find((m) => {
+          const a = m.merchantName.toLowerCase();
+          const b = recentFlyerEntry.store.toLowerCase();
+          return a.includes(b) || b.includes(a) || a.split(" ")[0] === b.split(" ")[0];
+        });
+        if (storeMatch) {
+          best = storeMatch;
+        } else {
+          // No live Flipp listing for that store — synthesize one from the manual entry
+          best = {
+            id: -(recentFlyerEntry.id),
+            name: item.name,
+            currentPrice: recentFlyerEntry.price,
+            originalPrice: null,
+            merchantName: recentFlyerEntry.store,
+            saleStory: "Manually tracked flyer price",
+            validFrom: recentFlyerEntry.date,
+            validTo: new Date(new Date(recentFlyerEntry.date).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            imageUrl: null,
+            unitPrice: recentFlyerEntry.unitPrice,
+            unit: recentFlyerEntry.unit,
+          };
+        }
+      } else {
+        best = withUnit.length > 0
           ? withUnit.reduce((a, b) => (a.unitPrice! < b.unitPrice! ? a : b))
           : matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
-
-      // Normalize both the flyer price and the latest tracked price to their
-      // canonical units (per kg, per L) so lb/kg comparisons work correctly.
-      const latest = item.priceEntries[0];
-      const latestNorm = latest
-        ? normalizePrice(latest.unitPrice, latest.unit || item.unit)
-        : null;
+      }
       const flyerNorm = best.unitPrice && best.unit
         ? normalizePrice(best.unitPrice, best.unit)
         : null;

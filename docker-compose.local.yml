@@ -1,0 +1,4 @@
+services:
+  grocery-tracker:
+    ports:
+      - "7800:7800"
