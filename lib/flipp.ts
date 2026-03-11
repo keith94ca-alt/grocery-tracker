@@ -1,5 +1,35 @@
 const FLIPP_BASE = "https://backflipp.wishabi.com/flipp";
 
+/**
+ * Canadian grocery flyers (No Frills, Loblaws, Metro, FreshCo, Walmart, etc.)
+ * all release on Thursday and run until Wednesday night.
+ * Returns seconds until next Thursday at 6:00 AM Eastern, so the cache
+ * refreshes automatically each week right when new flyers go live.
+ */
+function secondsUntilNextFlyerDay(): number {
+  const now = new Date();
+  // Compute current time in Eastern (handles EST/EDT automatically)
+  const est = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+  const THURSDAY = 4; // 0 = Sunday
+  const FLYER_HOUR = 6; // 6:00 AM — flyers are live by this time
+
+  const day = est.getDay();
+  const hour = est.getHours();
+  let daysUntil = (THURSDAY - day + 7) % 7;
+
+  if (daysUntil === 0) {
+    if (hour < FLYER_HOUR) {
+      // It's Thursday but before 6 AM — wait until later today
+      return (FLYER_HOUR - hour) * 3600;
+    }
+    // It's Thursday after 6 AM — flyers already loaded, wait until next Thursday
+    daysUntil = 7;
+  }
+
+  const hoursUntil = daysUntil * 24 + (FLYER_HOUR - hour);
+  return Math.max(hoursUntil * 3600, 3600); // floor at 1 hour as a safety net
+}
+
 // Ontario grocery chains to include (lowercase substring match)
 const TARGET_MERCHANTS = [
   "no frills",
@@ -21,6 +51,14 @@ const TARGET_MERCHANTS = [
   "your independent grocer",
   "foodland",
   "t&t",
+];
+
+/** Broad food categories searched when browsing this week's flyers */
+const FLYER_CATEGORIES = [
+  "beef", "chicken", "pork", "fish", "turkey", "bacon", "ham", "sausage",
+  "milk", "butter", "cheese", "eggs", "yogurt",
+  "bread", "pasta", "rice", "cereal",
+  "apples", "bananas", "vegetables", "coffee", "juice",
 ];
 
 export interface FlippItem {
@@ -63,14 +101,29 @@ function parseSize(name: string): { qty: number; unit: string } | null {
 }
 
 /**
- * Fetch current flyer deals from Flipp for a given search query.
- * Filters to Ontario grocery chains only.
- * Returns items sorted by unit price ascending (cheapest first).
+ * Strip size/quantity suffixes to produce a clean tracking name.
+ * "Extra Lean Ground Beef 454 g" → "Extra Lean Ground Beef"
  */
-export async function searchFlippDeals(
-  query: string,
-  postalCode: string
-): Promise<FlippItem[]> {
+export function simplifyFlyerName(name: string): string {
+  return name
+    .replace(/\s+\d+(?:\.\d+)?\s*(?:kg|g|L|mL|lb|lbs?|oz|pk|pack|ct|count)s?\b\.?/gi, "")
+    .replace(/\s+x\s*\d+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
+ * Returns true if all significant words of `trackedName` appear in `flippName`.
+ * "Ground Beef" matches "Extra Lean Ground Beef 454g" but NOT "Beef Broth".
+ */
+export function matchesTrackedItem(flippName: string, trackedName: string): boolean {
+  const flippLower = flippName.toLowerCase();
+  const words = trackedName.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  return words.length > 0 && words.every((w) => flippLower.includes(w));
+}
+
+/** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */
+async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippItem[]> {
   try {
     const url =
       `${FLIPP_BASE}/items/search` +
@@ -83,7 +136,7 @@ export async function searchFlippDeals(
           "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15",
         Accept: "application/json",
       },
-      next: { revalidate: 3600 }, // cache server-side for 1 hour
+      next: { revalidate: secondsUntilNextFlyerDay() },
     });
 
     if (!res.ok) return [];
@@ -111,10 +164,39 @@ export async function searchFlippDeals(
           unitPrice: size ? item.current_price / size.qty : null,
           unit: size?.unit ?? null,
         };
-      })
-      .filter((item) => item.unitPrice !== null) // only items we can compare
-      .sort((a, b) => (a.unitPrice ?? 9999) - (b.unitPrice ?? 9999));
+      });
   } catch {
     return [];
   }
+}
+
+/**
+ * Search Flipp for a specific item — for home page deal comparisons.
+ * Only returns items where a unit price can be computed. Sorted cheapest first.
+ */
+export async function searchFlippDeals(
+  query: string,
+  postalCode: string
+): Promise<FlippItem[]> {
+  const items = await fetchFlippRaw(query, postalCode);
+  return items
+    .filter((item) => item.unitPrice !== null)
+    .sort((a, b) => (a.unitPrice ?? 9999) - (b.unitPrice ?? 9999));
+}
+
+/**
+ * Fetch a broad browse list of this week's flyer items across common food categories.
+ * Includes items even without a parseable unit price (for manual price entry).
+ * Deduplicates by Flipp item ID.
+ */
+export async function fetchFlyerBrowse(postalCode: string): Promise<FlippItem[]> {
+  const results = await Promise.all(
+    FLYER_CATEGORIES.map((cat) => fetchFlippRaw(cat, postalCode))
+  );
+  const seen = new Set<number>();
+  return results.flat().filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
 }

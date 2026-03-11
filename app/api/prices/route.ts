@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { itemName, category, unit, price, quantity, store, date, notes } = body;
+    const { itemName, category, unit, price, quantity, store, date, notes, source } = body;
 
     if (!itemName?.trim()) {
       return NextResponse.json({ error: "Item name is required" }, { status: 400 });
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         unitPrice,
         unit: unit || "each",
         store: store.trim(),
-        source: "manual",
+        source: source || "manual",
         date: entryDate,
         notes: notes?.trim() || null,
       },
