@@ -571,7 +571,7 @@ export default function FlyerPage() {
               : "border-transparent text-gray-500"
           }`}
         >
-          On Your List {!loading && `(${displayed.length})`}
+          On Your List {!loading && `(${trackedItems.length})`}
         </button>
       </div>
 
