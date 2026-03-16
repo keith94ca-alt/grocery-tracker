@@ -16,6 +16,7 @@ model Item {
   watched      Boolean      @default(false)
   createdAt    DateTime     @default(now())
   priceEntries PriceEntry[]
+  flyerNotes   FlyerNote[]
 }
 
 model Store {
@@ -43,4 +44,19 @@ model PriceEntry {
 
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
   storeRef  Store?   @relation(fields: [storeId], references: [id])
+}
+
+model FlyerNote {
+  id        Int      @id @default(autoincrement())
+  itemId    Int
+  flippId   Int      // Flipp item ID for matching
+  price     Float
+  unitPrice Float
+  unit      String   // e.g. "per kg", "per lb", "each"
+  store     String
+  validFrom String
+  validTo   String
+  createdAt DateTime @default(now())
+
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
 }

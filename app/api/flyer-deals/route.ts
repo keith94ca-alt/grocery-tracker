@@ -37,8 +37,20 @@ export async function GET(request: NextRequest) {
           take: 10,
           select: { id: true, unitPrice: true, unit: true, source: true, store: true, date: true, price: true },
         },
+        flyerNotes: true,
       },
     });
+
+    // Build a map of flippId → flyer note for quick lookup
+    const flyerNoteMap = new Map<string, { unitPrice: number; unit: string }>();
+    for (const item of items) {
+      for (const note of item.flyerNotes) {
+        flyerNoteMap.set(`${item.id}:${note.flippId}:${note.store}`, {
+          unitPrice: note.unitPrice,
+          unit: note.unit,
+        });
+      }
+    }
 
     const results: DealResult[] = [];
 
@@ -58,9 +70,15 @@ export async function GET(request: NextRequest) {
       // Pick the cheapest deal by current price — unit price is only used
       // for comparison, not for selecting which deal to highlight
       const best = matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
-      const withUnit = matches.filter((fi) => fi.unitPrice !== null);
 
-      const flyerNorm = (best.unitPrice && best.unit)
+      // Check for a flyer note that overrides the unit info for this deal
+      const noteKey = `${item.id}:${best.id}:${best.merchantName}`;
+      const flyerNote = flyerNoteMap.get(noteKey);
+
+      // Compute flyer normalized price: flyer note > Flipp unit price > null
+      const flyerNorm = flyerNote
+        ? normalizePrice(flyerNote.unitPrice, flyerNote.unit)
+        : (best.unitPrice && best.unit)
         ? normalizePrice(best.unitPrice, best.unit)
         : null;
 

@@ -101,8 +101,26 @@ function AddModal({
     setSaving(true);
     setError("");
 
-    // "Note Flyer Price" — just acknowledge the deal, no price entry created
+    // "Note Flyer Price" — save to flyer notes (not purchase history)
     if (source === "flyer") {
+      try {
+        await fetch("/api/flyer-notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemName: itemName.trim(),
+            flippId: flippItem.id,
+            price: flippItem.currentPrice,
+            unitPrice: computedUnitPrice ?? flippItem.unitPrice ?? flippItem.currentPrice,
+            unit: unit,
+            store: flippItem.merchantName,
+            validFrom: flippItem.validFrom,
+            validTo: flippItem.validTo,
+          }),
+        });
+      } catch {
+        // Ignore save errors for flyer notes
+      }
       onAdded(flippItem.id, itemName.trim());
       setSaving(false);
       return;
