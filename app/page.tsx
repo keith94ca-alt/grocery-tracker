@@ -279,10 +279,8 @@ export default function SearchPage() {
                             ${deal.flyerUnitPrice.toFixed(2)}/{deal.flyerUnit.replace("per ", "")}
                           </p>
                         )}
-                        {isGood && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
+                        {deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
                           <span className="text-xs font-bold text-green-600">Save {deal.savingsPercent}%</span>
-                        ) : !isGood ? (
-                          <span className="text-xs font-semibold text-orange-500">On Sale</span>
                         ) : null}
                       </div>
                       {deal.bestDeal.imageUrl && (
@@ -301,9 +299,7 @@ export default function SearchPage() {
                     </div>
                     {/* Only show price comparison when units are actually comparable */}
                     {unitsComparable && (
-                      <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs text-gray-500 ${
-                        isGood ? "border-green-100" : "border-orange-100"
-                      }`}>
+                      <div className="mt-2 pt-2 border-t border-green-100 flex items-center justify-between text-xs text-gray-500">
                         <span>Your last: <strong>${deal.latestUnitPrice!.toFixed(2)}/{deal.latestUnit!.replace("per ", "")}</strong></span>
                         {deal.bestDeal.validTo && (
                           <span>Until {formatValidTo(deal.bestDeal.validTo)}</span>
@@ -312,9 +308,7 @@ export default function SearchPage() {
                     )}
                     {/* Show expiry even without price comparison */}
                     {!unitsComparable && deal.bestDeal.validTo && (
-                      <p className={`mt-2 pt-2 border-t text-xs text-right text-gray-400 ${
-                        isGood ? "border-green-100" : "border-orange-100"
-                      }`}>
+                      <p className="mt-2 pt-2 border-t border-green-100 text-xs text-right text-gray-400">
                         Until {formatValidTo(deal.bestDeal.validTo)}
                       </p>
                     )}
