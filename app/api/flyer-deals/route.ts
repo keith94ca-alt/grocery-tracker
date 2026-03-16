@@ -61,6 +61,8 @@ export async function GET(request: NextRequest) {
       const withUnit = matches.filter((fi) => fi.unitPrice !== null);
 
       const flyerNorm = (best.unitPrice && best.unit)
+        ? normalizePrice(best.unitPrice, best.unit)
+        : null;
 
       let isCheaper = false;
       let savingsPercent: number | null = null;
@@ -73,6 +75,16 @@ export async function GET(request: NextRequest) {
         isCheaper = flyerNorm.price < latestNorm.price;
         if (isCheaper) {
           savingsPercent = Math.round((1 - flyerNorm.price / latestNorm.price) * 100);
+        }
+      } else if (
+        !flyerNorm &&
+        latestNorm &&
+        (latestNorm.unit === "each" || latestNorm.unit === "per pack")
+      ) {
+        // Flyer has no unit price, but tracked item is per-item — compare current prices directly
+        isCheaper = best.currentPrice < latestNonFlyer.price;
+        if (isCheaper) {
+          savingsPercent = Math.round((1 - best.currentPrice / latestNonFlyer.price) * 100);
         }
       }
 
