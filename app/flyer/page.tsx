@@ -544,11 +544,26 @@ export default function FlyerPage() {
   return (
     <div className="px-4 py-4 space-y-4">
       {/* Header */}
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">🏷️ This Week&apos;s Flyers</h2>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Ontario grocery chains · Refreshes every Thursday
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">🏷️ This Week&apos;s Flyers</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Ontario grocery chains · Refreshes every Thursday
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setLoading(true);
+            fetch("/api/flyer-items")
+              .then((r) => r.json())
+              .then((d) => { if (Array.isArray(d)) setItems(d); })
+              .catch(() => {})
+              .finally(() => setLoading(false));
+          }}
+          className="shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+        >
+          ↻ Refresh
+        </button>
       </div>
 
       {/* Search */}
