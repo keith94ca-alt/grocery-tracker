@@ -488,9 +488,8 @@ export default function FlyerPage() {
   const trackedItems = items.filter((i) => i.trackedMatch);
 
   const displayed = (tab === "new" ? newItems : trackedItems).filter((i) => {
-    // Hide if already added this session OR already logged from a flyer this week
+    // Hide if already added this session
     if (added.has(i.flippItem.id)) return false;
-    if (tab === "tracked" && i.trackedMatch?.recentlyLogged) return false;
     const matchesStore = storeFilter === "All" || i.flippItem.merchantName === storeFilter;
     const matchesFilter =
       !filter ||
@@ -572,7 +571,7 @@ export default function FlyerPage() {
               : "border-transparent text-gray-500"
           }`}
         >
-          On Your List {!loading && `(${trackedItems.length})`}
+          On Your List {!loading && `(${displayed.length})`}
         </button>
       </div>
 

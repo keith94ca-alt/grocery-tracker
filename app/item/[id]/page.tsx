@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { convertUnitPrice, sameUnitGroup } from "@/lib/units";
 import type { DealResult } from "@/app/api/flyer-deals/route";
+import type { FlippItem } from "@/lib/flipp";
 
 interface PriceEntry {
   id: number;
@@ -79,9 +80,9 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
   );
 }
 
-function FlyerDealBanner({ deal }: { deal: DealResult }) {
+function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () => void }) {
   const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
-          flyerUnitPrice, flyerUnit } = deal;
+          flyerUnitPrice, flyerUnit, allDeals } = deal;
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const validFrom = bestDeal.validFrom
     ? new Date(bestDeal.validFrom).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
@@ -123,9 +124,6 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
           </div>
           <p className="text-sm text-gray-700 mt-1 font-medium truncate">{bestDeal.name}</p>
           <p className="text-xs text-gray-500 mt-0.5">{bestDeal.merchantName}</p>
-          {bestDeal.saleStory && (
-            <p className="mt-1 text-xs text-orange-600 font-medium">{bestDeal.saleStory}</p>
-          )}
         </div>
         <div className="flex items-start gap-3 shrink-0">
           {bestDeal.imageUrl && (
@@ -162,10 +160,7 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
             </span>
           )}
           {isCheaper && savingsPercent !== null && savingsPercent > 0 && (
-            <span className="text-green-600 font-bold">Save {savingsPercent}%</span>
-          )}
-          {!isCheaper && canCompare && (
-            <span className="text-gray-400">Above your tracked price</span>
+            <span className="text-green-600 font-bold">Save {savingsPercent}% vs your last price</span>
           )}
           {flyerUnitPrice === null && (
             <span className="text-gray-400">
@@ -179,6 +174,16 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
           </span>
         )}
       </div>
+
+      {/* See all deals button */}
+      {allDeals && allDeals.length > 1 && (
+        <button
+          onClick={onViewAll}
+          className="mt-2 w-full py-2 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+        >
+          See all {allDeals.length} flyer deals →
+        </button>
+      )}
     </div>
     </>
   );
@@ -198,6 +203,8 @@ export default function ItemPage() {
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deal, setDeal] = useState<DealResult | null>(null);
+  const [allDeals, setAllDeals] = useState<FlippItem[]>([]);
+  const [showDealsModal, setShowDealsModal] = useState(false);
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -216,7 +223,10 @@ export default function ItemPage() {
     fetch(`/api/flyer-deals?itemId=${params.id}`)
       .then((r) => r.json())
       .then((data: DealResult[]) => {
-        if (Array.isArray(data) && data.length > 0) setDeal(data[0]);
+        if (Array.isArray(data) && data.length > 0) {
+          setDeal(data[0]);
+          setAllDeals(data[0].allDeals ?? []);
+        }
       })
       .catch(() => {});
   }, [params.id]);
@@ -269,7 +279,7 @@ export default function ItemPage() {
       </div>
 
       {/* Flyer deal banner — appears when Flipp has a match */}
-      {deal && <FlyerDealBanner deal={deal} />}
+      {deal && <FlyerDealBanner deal={deal} onViewAll={() => setShowDealsModal(true)} />}
 
       {/* Deal indicator (latest manual entry vs own historical average) */}
       {item.stats && latest && item.priceEntries.length >= 3 && (
@@ -369,6 +379,59 @@ export default function ItemPage() {
           </div>
         )}
       </div>
+
+      {/* All Flyer Deals Modal */}
+      {showDealsModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-[60]" onClick={() => setShowDealsModal(false)} />
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900">Flyer Deals</h3>
+                <button onClick={() => setShowDealsModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+              </div>
+              <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
+                {allDeals.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-8">No flyer deals found this week</p>
+                ) : (
+                  allDeals.map((d) => {
+                    const validTo = d.validTo
+                      ? new Date(d.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+                      : null;
+                    return (
+                      <div key={d.id} className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex gap-3 items-start">
+                        {d.imageUrl && (
+                          <img src={d.imageUrl} alt={d.name} className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100" loading="lazy" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 text-sm leading-snug">{d.name}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{d.merchantName}</p>
+                          {d.saleStory && <p className="text-xs text-orange-600 font-medium mt-0.5">{d.saleStory}</p>}
+                          {validTo && <p className="text-xs text-gray-400 mt-0.5">Until {validTo}</p>}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-base font-bold text-gray-900">${d.currentPrice.toFixed(2)}</p>
+                          {d.unitPrice && d.unit && (
+                            <p className="text-xs text-gray-500">${d.unitPrice.toFixed(2)}/{d.unit.replace("per ", "")}</p>
+                          )}
+                          {d.postPriceText && !d.unitPrice && (
+                            <p className="text-xs text-gray-500">/${d.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div className="px-5 py-3 border-t border-gray-100">
+                <button onClick={() => setShowDealsModal(false)} className="w-full py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-600">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
