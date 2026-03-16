@@ -279,9 +279,6 @@ export default function SearchPage() {
                             ${deal.flyerUnitPrice.toFixed(2)}/{deal.flyerUnit.replace("per ", "")}
                           </p>
                         )}
-                        {deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
-                          <span className="text-xs font-bold text-green-600">Save {deal.savingsPercent}%</span>
-                        ) : null}
                       </div>
                       {deal.bestDeal.imageUrl && (
                         <img

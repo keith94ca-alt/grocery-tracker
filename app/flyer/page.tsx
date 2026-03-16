@@ -100,6 +100,14 @@ function AddModal({
     if (!itemName.trim()) { setError("Item name is required"); return; }
     setSaving(true);
     setError("");
+
+    // "Note Flyer Price" — just acknowledge the deal, no price entry created
+    if (source === "flyer") {
+      onAdded(flippItem.id, itemName.trim());
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/prices", {
         method: "POST",
@@ -334,7 +342,7 @@ function AddModal({
 
           {trackedMatch && (
             <p className="text-xs text-gray-500">
-              <strong>Note Flyer Price</strong> = just record what the flyer says (no purchase logged).
+              <strong>Note Flyer Price</strong> = just mark this deal as seen (no price logged).
               <strong> Log as Bought</strong> = you actually purchased this — adds to your price history.
             </p>
           )}
