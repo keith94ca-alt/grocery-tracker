@@ -82,16 +82,43 @@ export interface FlippItem {
   imageUrl: string | null;
   unitPrice: number | null; // normalized price (e.g. per kg)
   unit: string | null;      // canonical unit (e.g. "per kg")
+  postPriceText: string | null; // raw unit text from Flipp (e.g. "LB", "/kg", "EACH")
 }
 
 /**
  * Parse a size/quantity from a product name.
- * e.g. "Extra Lean Ground Beef 454 g" → { qty: 0.454, unit: "per kg" }
- * e.g. "Chicken Breast 2 kg"          → { qty: 2,     unit: "per kg" }
- * e.g. "Milk 2 L"                     → { qty: 2,     unit: "per L"  }
+ * e.g. "Extra Lean Ground Beef 454 g"      → { qty: 0.454, unit: "per kg" }
+ * e.g. "Chicken Breast 2 kg"               → { qty: 2,     unit: "per kg" }
+ * e.g. "Milk 2 L"                          → { qty: 2,     unit: "per L"  }
+ * e.g. "Beyond Meat 340 g pkg"             → { qty: 0.340, unit: "per kg" }
+ * e.g. "Yogurt 4x95/100 g"                 → { qty: 0.38,  unit: "per kg" } (4×95g=380g)
  * Returns null if no recognizable unit found.
  */
 function parseSize(name: string): { qty: number; unit: string } | null {
+  // First check for multi-pack patterns: "4x95/100 g", "2x500 g", "6x355 mL"
+  const multiPack = name.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*(?:\/\s*\d+\s*)?(kg|g|L|mL|lb|lbs?)\b/i);
+  if (multiPack) {
+    const count = parseInt(multiPack[1]);
+    const each = parseFloat(multiPack[2]);
+    const rawUnit = multiPack[3].toLowerCase();
+    const totalG = rawUnit.startsWith("kg") ? count * each * 1000
+      : rawUnit === "g" ? count * each
+      : rawUnit.startsWith("lb") ? count * each * 453.592
+      : rawUnit === "l" ? count * each * 1000  // treat as mL, normalize below
+      : rawUnit === "ml" ? count * each
+      : 0;
+    if (totalG > 0) {
+      if (rawUnit === "l" || rawUnit === "ml") {
+        const totalMl = rawUnit === "l" ? count * each * 1000 : count * each;
+        const qty = totalMl * 0.001; // convert mL to L
+        return qty > 0 ? { qty, unit: "per L" } : null;
+      }
+      const qty = totalG * 0.001; // convert g to kg
+      return qty > 0 ? { qty, unit: "per kg" } : null;
+    }
+  }
+
+  // Standard patterns: "454 g", "2 kg", "1.5 lb", "2 L", "500 mL"
   const patterns: Array<[RegExp, string, number]> = [
     [/(\d+(?:\.\d+)?)\s*kg/i,      "per kg", 1],
     [/(\d+(?:\.\d+)?)\s*g(?!\w)/i, "per kg", 0.001],
@@ -110,48 +137,53 @@ function parseSize(name: string): { qty: number; unit: string } | null {
 }
 
 /**
- * Parse a per-unit price from Flipp's `price_text` field.
- * Canadian flyers commonly list "$2.99/lb", "$14.44/kg", "$0.99/100g" etc.
- * All weight units are normalised to per kg; volume to per L.
+ * Parse a per-unit price from Flipp's `post_price_text` field and `current_price`.
  *
- * e.g. "$2.99/lb"   → { unitPrice: 6.60, unit: "per kg" }
- * e.g. "$14.44/kg"  → { unitPrice: 14.44, unit: "per kg" }
- * e.g. "$0.99/100g" → { unitPrice: 9.90,  unit: "per kg" }
- * e.g. "$2.99"      → null  (no unit info)
- * e.g. "2/$5.00"    → null  (multi-buy, can't determine unit)
+ * Flipp's actual format:
+ *   - `post_price_text`: "LB", "/lb", "/kg", "/L", "EACH", "EA.", null, etc.
+ *   - `current_price`: the numeric price (e.g. 5.99 for $5.99/lb)
+ *   - `pre_price_text`: sometimes "2/" for "2/$7" multi-buys, or promo text
+ *
+ * All weight units normalised to per kg; volume to per L.
+ *
+ * e.g. current_price=5.99, post_price_text="LB"    → { unitPrice: 13.20, unit: "per kg" }
+ * e.g. current_price=14.44, post_price_text="/kg"   → { unitPrice: 14.44, unit: "per kg" }
+ * e.g. current_price=2.99, post_price_text="EACH"   → null (per-item, no weight unit)
+ * e.g. current_price=2.99, post_price_text=null      → null (no unit info)
  */
-function parsePriceText(
-  priceText: string | null | undefined
+function parsePostPriceText(
+  postPriceText: string | null | undefined,
+  currentPrice: number
 ): { unitPrice: number; unit: string } | null {
-  if (!priceText) return null;
+  if (!postPriceText || !currentPrice || currentPrice <= 0) return null;
 
-  // Match patterns like "$2.99/lb", "2.99 / kg", "$0.99/100g", "$1.49/100mL"
-  const m = priceText.match(
-    /\$?\s*(\d+(?:\.\d+)?)\s*\/\s*(lb|lbs?|kg|100\s*g|g(?!al)|L(?!b)|100\s*mL|mL)/i
+  const normalized = postPriceText.trim().toLowerCase();
+
+  // Extract unit from the post_price_text
+  // Common formats: "LB", "/lb", "/kg", "lb", "kg", "/L", "/l", "/100g", "100g", "/100 mL"
+  const unitMatch = normalized.match(
+    /\/?\s*(lb|lbs?|kg|100\s*g|g(?!al)|100\s*mL|mL|l(?!b))\b/
   );
-  if (!m) return null;
+  if (!unitMatch) return null;
 
-  const price = parseFloat(m[1]);
-  const rawUnit = m[2].replace(/\s+/g, "").toLowerCase();
-
-  if (!price || price <= 0) return null;
+  const rawUnit = unitMatch[1].replace(/\s+/g, "").toLowerCase();
 
   switch (rawUnit) {
     case "lb":
     case "lbs":
-      return { unitPrice: price / 0.453592, unit: "per kg" };
+      return { unitPrice: currentPrice / 0.453592, unit: "per kg" };
     case "kg":
-      return { unitPrice: price, unit: "per kg" };
+      return { unitPrice: currentPrice, unit: "per kg" };
     case "100g":
-      return { unitPrice: price * 10, unit: "per kg" };
+      return { unitPrice: currentPrice * 10, unit: "per kg" };
     case "g":
-      return { unitPrice: price * 1000, unit: "per kg" };
+      return { unitPrice: currentPrice * 1000, unit: "per kg" };
     case "l":
-      return { unitPrice: price, unit: "per L" };
+      return { unitPrice: currentPrice, unit: "per L" };
     case "100ml":
-      return { unitPrice: price * 10, unit: "per L" };
+      return { unitPrice: currentPrice * 10, unit: "per L" };
     case "ml":
-      return { unitPrice: price * 1000, unit: "per L" };
+      return { unitPrice: currentPrice * 1000, unit: "per L" };
     default:
       return null;
   }
@@ -287,20 +319,21 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
       })
       .map((item): FlippItem => {
         const currentPrice: number = item.current_price ?? 0;
+        const postPriceText: string | null = item.post_price_text ?? null;
 
         // 1st choice: size token in the product name (most reliable)
         //   e.g. "Extra Lean Ground Beef 454 g"
         const size = parseSize(item.name ?? "");
 
-        // 2nd choice: Flipp's price_text field
-        //   e.g. "$2.99/lb", "$14.44/kg", "$0.99/100g"
-        const fromPriceText = size ? null : parsePriceText(item.price_text);
+        // 2nd choice: Flipp's post_price_text field + current_price
+        //   e.g. "LB" → price is per lb, "/kg" → price is per kg
+        const fromPostPrice = size ? null : parsePostPriceText(postPriceText, currentPrice);
 
         const unitPrice = size
           ? currentPrice / size.qty
-          : fromPriceText?.unitPrice ?? null;
+          : fromPostPrice?.unitPrice ?? null;
 
-        const unit = size?.unit ?? fromPriceText?.unit ?? null;
+        const unit = size?.unit ?? fromPostPrice?.unit ?? null;
 
         return {
           id: item.id,
@@ -315,6 +348,7 @@ async function fetchFlippRaw(query: string, postalCode: string): Promise<FlippIt
           imageUrl: item.clean_image_url ?? null,
           unitPrice,
           unit,
+          postPriceText,
         };
       });
   } catch {

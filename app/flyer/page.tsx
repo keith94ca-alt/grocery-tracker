@@ -199,6 +199,11 @@ function AddModal({
                       (${flippItem.unitPrice.toFixed(2)}/{flippItem.unit.replace("per ", "")})
                     </span>
                   )}
+                  {!flippItem.unitPrice && flippItem.postPriceText && (
+                    <span className="text-sm font-normal text-gray-500 ml-1">
+                      /{flippItem.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}
+                    </span>
+                  )}
                 </span>
                 {validTo && (
                   <span className="text-xs text-gray-400">
@@ -398,6 +403,9 @@ function FlyerCard({
         <p className="text-base font-bold text-gray-900">${flippItem.currentPrice.toFixed(2)}</p>
         {flippItem.unitPrice && unitLabel && (
           <p className="text-xs text-gray-500">${flippItem.unitPrice.toFixed(2)}/{unitLabel}</p>
+        )}
+        {!flippItem.unitPrice && flippItem.postPriceText && (
+          <p className="text-xs text-gray-500">${flippItem.currentPrice.toFixed(2)}/{flippItem.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
         )}
         {added ? (
           <span className="mt-2 inline-block text-xs text-green-600 font-semibold">✓ Added</span>
