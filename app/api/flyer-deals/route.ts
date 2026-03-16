@@ -55,11 +55,10 @@ export async function GET(request: NextRequest) {
       if (!latestNonFlyer) continue; // No manual baseline yet — can't confirm a deal
       const latestNorm = normalizePrice(latestNonFlyer.unitPrice, latestNonFlyer.unit || item.unit);
 
-      // Prefer items with a parseable unit price; fall back to cheapest raw price
+      // Pick the cheapest deal by current price — unit price is only used
+      // for comparison, not for selecting which deal to highlight
+      const best = matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
       const withUnit = matches.filter((fi) => fi.unitPrice !== null);
-      const best = withUnit.length > 0
-        ? withUnit.reduce((a, b) => (a.unitPrice! < b.unitPrice! ? a : b))
-        : matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
 
       const flyerNorm = (best.unitPrice && best.unit)
 

@@ -80,6 +80,91 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
   );
 }
 
+// ── All Deals Modal ───────────────────────────────────────────────────────────
+
+function AllDealsModal({ deals, onClose }: { deals: FlippItem[]; onClose: () => void }) {
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+
+  return (
+    <>
+      {lightboxImg && (
+        <ImageLightbox src={lightboxImg} alt="" onClose={() => setLightboxImg(null)} />
+      )}
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+            <h3 className="text-lg font-bold text-gray-900">🏷️ All Flyer Deals</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+          </div>
+          <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
+            {deals.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">No flyer deals found this week</p>
+            ) : (
+              deals.map((d) => {
+                const validTo = d.validTo
+                  ? new Date(d.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+                  : null;
+                const validFrom = d.validFrom
+                  ? new Date(d.validFrom).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+                  : null;
+                const flippUrl = d.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(d.name)}`;
+                return (
+                  <div key={d.id} className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex gap-3 items-start">
+                    {d.imageUrl && (
+                      <img
+                        src={d.imageUrl}
+                        alt={d.name}
+                        className="w-14 h-14 rounded-lg object-cover shrink-0 bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                        loading="lazy"
+                        onClick={() => setLightboxImg(d.imageUrl!)}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm leading-snug">{d.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{d.merchantName}</p>
+                      {d.saleStory && <p className="text-xs text-orange-600 font-medium mt-0.5">{d.saleStory}</p>}
+                      <div className="flex items-center gap-2 mt-1">
+                        {validTo && (
+                          <p className="text-xs text-gray-400">
+                            {validFrom ? `${validFrom} – ${validTo}` : `Until ${validTo}`}
+                          </p>
+                        )}
+                        <a
+                          href={flippUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-brand-600 underline font-medium"
+                        >
+                          View on Flipp →
+                        </a>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-base font-bold text-gray-900">${d.currentPrice.toFixed(2)}</p>
+                      {d.unitPrice && d.unit && (
+                        <p className="text-xs text-gray-500">${d.unitPrice.toFixed(2)}/{d.unit.replace("per ", "")}</p>
+                      )}
+                      {d.postPriceText && !d.unitPrice && (
+                        <p className="text-xs text-gray-500">/${d.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div className="px-5 py-3 border-t border-gray-100">
+            <button onClick={onClose} className="w-full py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-600">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () => void }) {
   const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
           flyerUnitPrice, flyerUnit, allDeals } = deal;
@@ -381,57 +466,7 @@ export default function ItemPage() {
       </div>
 
       {/* All Flyer Deals Modal */}
-      {showDealsModal && (
-        <>
-          <div className="fixed inset-0 bg-black/40 z-[60]" onClick={() => setShowDealsModal(false)} />
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900">Flyer Deals</h3>
-                <button onClick={() => setShowDealsModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
-              </div>
-              <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
-                {allDeals.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-8">No flyer deals found this week</p>
-                ) : (
-                  allDeals.map((d) => {
-                    const validTo = d.validTo
-                      ? new Date(d.validTo).toLocaleDateString("en-CA", { month: "short", day: "numeric" })
-                      : null;
-                    return (
-                      <div key={d.id} className="bg-gray-50 rounded-xl border border-gray-200 p-3 flex gap-3 items-start">
-                        {d.imageUrl && (
-                          <img src={d.imageUrl} alt={d.name} className="w-12 h-12 rounded-lg object-cover shrink-0 bg-gray-100" loading="lazy" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 text-sm leading-snug">{d.name}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{d.merchantName}</p>
-                          {d.saleStory && <p className="text-xs text-orange-600 font-medium mt-0.5">{d.saleStory}</p>}
-                          {validTo && <p className="text-xs text-gray-400 mt-0.5">Until {validTo}</p>}
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-base font-bold text-gray-900">${d.currentPrice.toFixed(2)}</p>
-                          {d.unitPrice && d.unit && (
-                            <p className="text-xs text-gray-500">${d.unitPrice.toFixed(2)}/{d.unit.replace("per ", "")}</p>
-                          )}
-                          {d.postPriceText && !d.unitPrice && (
-                            <p className="text-xs text-gray-500">/${d.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <div className="px-5 py-3 border-t border-gray-100">
-                <button onClick={() => setShowDealsModal(false)} className="w-full py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-600">
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+      {showDealsModal && <AllDealsModal deals={allDeals} onClose={() => setShowDealsModal(false)} />}
     </div>
   );
 }

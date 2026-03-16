@@ -34,6 +34,7 @@ export function getCanonicalUnit(unit: string): string {
 
 // Returns true if two units can be converted between each other
 export function sameUnitGroup(unit1: string, unit2: string): boolean {
+  if (unit1 === unit2) return true;
   return (
     (unit1 in weightScale && unit2 in weightScale) ||
     (unit1 in volumeScale && unit2 in volumeScale)
