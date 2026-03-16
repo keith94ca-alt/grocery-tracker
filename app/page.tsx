@@ -135,7 +135,7 @@ export default function SearchPage() {
   // - Orange: advertised sale but can't compare units
   // - Hidden: no deal signal, or confirmed more expensive
   const flyerDeals = Array.from(dealsMap.values())
-    .filter((d) => d.isCheaper || (d.isOnFlyer && !!d.bestDeal.saleStory))
+    .filter((d) => d.isCheaper)
     .filter((d) => filteredItemIds.has(d.itemId));
 
   return (
@@ -247,7 +247,6 @@ export default function SearchPage() {
                 🏷️ Flyer deals this week
               </h2>
               {flyerDeals.map((deal) => {
-                const isGood = deal.isCheaper;
                 // Only show "Your last" if both are normalised to the same canonical unit
                 const unitsComparable = !!(
                   deal.latestUnitPrice !== null &&
@@ -257,25 +256,21 @@ export default function SearchPage() {
                 );
                 return (
                   <Link key={deal.itemId} href={`/item/${deal.itemId}`}
-                    className={`block rounded-xl border p-4 hover:shadow-md transition-shadow ${
-                      isGood
-                        ? "bg-green-50 border-green-200"
-                        : "bg-orange-50 border-orange-200"
-                    }`}>
+                    className="block rounded-xl border p-4 hover:shadow-md transition-shadow bg-green-50 border-green-200">
                     <div className="flex justify-between items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900">{deal.itemName}</p>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
                           {deal.bestDeal.name} · {deal.bestDeal.merchantName}
                         </p>
-                        {deal.bestDeal.saleStory && (
-                          <p className={`text-xs font-medium mt-0.5 ${isGood ? "text-green-700" : "text-orange-600"}`}>
-                            {deal.bestDeal.saleStory}
+                        {deal.savingsPercent !== null && (
+                          <p className="text-xs font-medium mt-0.5 text-green-700">
+                            Save {deal.savingsPercent}% vs your last paid price
                           </p>
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`text-lg font-bold ${isGood ? "text-green-700" : "text-orange-700"}`}>
+                        <p className="text-lg font-bold text-green-700">
                           ${deal.bestDeal.currentPrice.toFixed(2)}
                         </p>
                         {/* Show normalised per-kg/L price when available */}
@@ -364,9 +359,8 @@ export default function SearchPage() {
             ) : (
               filteredItems.map((item) => {
                 const deal = dealsMap.get(item.id);
-                // Only highlight if it's a confirmed deal or advertised sale
-                const hasDeal = !!(deal?.isCheaper || (deal?.isOnFlyer && deal.bestDeal.saleStory));
-                const isGoodDeal = deal?.isCheaper === true;
+                // Only highlight if it's a confirmed deal
+                const hasDeal = deal?.isCheaper === true;
                 // Watched item with no price history yet
                 const isWatchOnly = item.watched && !item.stats;
 
@@ -374,7 +368,7 @@ export default function SearchPage() {
                   return (
                     <Link key={item.id} href={`/item/${item.id}`}
                       className={`block bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
-                        hasDeal ? (isGoodDeal ? "border-green-200" : "border-orange-200") : "border-gray-200 border-dashed"
+                        hasDeal ? "border-green-200" : "border-gray-200 border-dashed"
                       }`}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0">
@@ -382,9 +376,7 @@ export default function SearchPage() {
                             <p className="font-semibold text-gray-900">{item.name}</p>
                             <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">⭐ Watching</span>
                             {hasDeal && (
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                isGoodDeal ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
-                              }`}>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                                 🏷️ On Flyer
                               </span>
                             )}
@@ -393,7 +385,7 @@ export default function SearchPage() {
                         </div>
                         {hasDeal && deal && (
                           <div className="text-right ml-3 shrink-0">
-                            <p className={`text-lg font-bold ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
+                            <p className="text-lg font-bold text-green-700">
                               ${deal.bestDeal.currentPrice.toFixed(2)}
                             </p>
                             <p className="text-xs text-gray-400">{deal.bestDeal.merchantName}</p>
@@ -401,12 +393,14 @@ export default function SearchPage() {
                         )}
                       </div>
                       {hasDeal && deal && (
-                        <div className={`mt-2 pt-2 border-t text-xs ${isGoodDeal ? "border-green-100" : "border-orange-100"}`}>
-                          <p className={`font-medium ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
-                            {deal.bestDeal.saleStory || "On sale this week"}
+                        <div className="mt-2 pt-2 border-t border-green-100 text-xs">
+                          <p className="font-medium text-green-700">
+                            {deal.savingsPercent !== null
+                              ? `Save ${deal.savingsPercent}% vs your last paid price`
+                              : "On sale this week"}
                           </p>
                           <Link href="/add" className="mt-1 inline-block text-brand-600 font-medium">
-                            + Log price →
+                            + Log purchase →
                           </Link>
                         </div>
                       )}
@@ -417,9 +411,7 @@ export default function SearchPage() {
                 return (
                   <Link key={item.id} href={`/item/${item.id}`}
                     className={`block bg-white rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
-                      isGoodDeal ? "border-green-200" :
-                      hasDeal ? "border-orange-200" :
-                      "border-gray-200"
+                      hasDeal ? "border-green-200" : "border-gray-200"
                     }`}>
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0">
@@ -427,14 +419,8 @@ export default function SearchPage() {
                           <p className="font-semibold text-gray-900">{item.name}</p>
                           {item.watched && <span className="text-xs text-gray-400">⭐</span>}
                           {hasDeal && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              isGoodDeal
-                                ? "bg-green-100 text-green-700"
-                                : "bg-orange-100 text-orange-700"
-                            }`}>
-                              🏷️ {isGoodDeal
-                                ? (deal!.savingsPercent ? `Save ${deal!.savingsPercent}%` : "On Sale")
-                                : "On Flyer"}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                              🏷️ {deal!.savingsPercent ? `Save ${deal!.savingsPercent}%` : "On Sale"}
                             </span>
                           )}
                         </div>
@@ -466,21 +452,17 @@ export default function SearchPage() {
                       </div>
                     )}
 
-                    {/* Flyer deal teaser — color matches deal quality */}
+                    {/* Flyer deal teaser — green when confirmed cheaper */}
                     {hasDeal && deal && (
-                      <div className={`mt-2 pt-2 border-t flex items-center justify-between text-xs ${
-                        isGoodDeal ? "border-green-100" : "border-orange-100"
-                      }`}>
-                        <span className={`font-medium truncate ${isGoodDeal ? "text-green-700" : "text-orange-700"}`}>
+                      <div className="mt-2 pt-2 border-t border-green-100 flex items-center justify-between text-xs">
+                        <span className="font-medium truncate text-green-700">
                           {deal.bestDeal.merchantName} · ${deal.bestDeal.currentPrice.toFixed(2)}
                           {deal.bestDeal.unitPrice && deal.bestDeal.unit
                             ? ` · $${deal.bestDeal.unitPrice.toFixed(2)}/${deal.bestDeal.unit.replace("per ", "")}`
                             : ""}
                         </span>
-                        {isGoodDeal && deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
+                        {deal.savingsPercent !== null && deal.savingsPercent > 0 ? (
                           <span className="text-green-600 font-bold shrink-0 ml-2">↓{deal.savingsPercent}%</span>
-                        ) : deal.bestDeal.saleStory ? (
-                          <span className="text-orange-600 font-semibold shrink-0 ml-2">Sale</span>
                         ) : null}
                       </div>
                     )}

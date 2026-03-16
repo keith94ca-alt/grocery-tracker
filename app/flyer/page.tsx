@@ -96,7 +96,7 @@ function AddModal({
 
   const { unit, qty, computedUnitPrice } = computeSend();
 
-  async function handleAdd() {
+  async function handleAdd(source: "manual" | "flyer") {
     if (!itemName.trim()) { setError("Item name is required"); return; }
     setSaving(true);
     setError("");
@@ -112,7 +112,7 @@ function AddModal({
           quantity: qty,
           store: flippItem.merchantName,
           date: new Date().toISOString(),
-          source: "flyer",
+          source,
           notes: flippItem.saleStory ?? undefined,
         }),
       });
@@ -165,7 +165,7 @@ function AddModal({
           {/* Header + Flipp link */}
           <div className="flex items-start justify-between gap-2">
             <h2 className="text-lg font-bold text-gray-900">
-              {trackedMatch ? "Update price" : "Track this item"}
+              {trackedMatch ? "Flyer deal for " + trackedMatch.name : "Track this item"}
             </h2>
             <a
               href={flippUrl}
@@ -332,6 +332,13 @@ function AddModal({
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
+          {trackedMatch && (
+            <p className="text-xs text-gray-500">
+              <strong>Note Flyer Price</strong> = just record what the flyer says (no purchase logged).
+              <strong> Log as Bought</strong> = you actually purchased this — adds to your price history.
+            </p>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
@@ -339,13 +346,32 @@ function AddModal({
             >
               Cancel
             </button>
-            <button
-              onClick={handleAdd}
-              disabled={saving}
-              className="flex-1 py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-60"
-            >
-              {saving ? "Saving…" : trackedMatch ? "Update Price" : "Start Tracking"}
-            </button>
+            {trackedMatch ? (
+              <>
+                <button
+                  onClick={() => handleAdd("flyer")}
+                  disabled={saving}
+                  className="flex-1 py-3 bg-orange-100 text-orange-700 rounded-xl text-sm font-semibold disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Note Flyer Price"}
+                </button>
+                <button
+                  onClick={() => handleAdd("manual")}
+                  disabled={saving}
+                  className="flex-1 py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-60"
+                >
+                  {saving ? "Saving…" : "Log as Bought"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleAdd("flyer")}
+                disabled={saving}
+                className="flex-1 py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Start Tracking"}
+              </button>
+            )}
           </div>
         </div>
         </div>
@@ -418,7 +444,7 @@ function FlyerCard({
                 : "bg-orange-100 text-orange-700"
             }`}
           >
-            {trackedMatch ? "Update Price" : "Track This"}
+            {trackedMatch ? "Compare" : "Track This"}
           </button>
         )}
       </div>

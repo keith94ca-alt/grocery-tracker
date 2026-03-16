@@ -91,13 +91,10 @@ function FlyerDealBanner({ deal }: { deal: DealResult }) {
     : null;
   const flippUrl = bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(bestDeal.name)}`;
 
-  // Colour scheme: green = confirmed cheaper, orange = on sale / can't compare, gray = unknown
+  // Colour scheme: green = confirmed cheaper, gray = unknown/not cheaper
   const colour = isCheaper
     ? { bg: "bg-green-50", border: "border-green-200", heading: "text-green-800",
         price: "text-green-700", divider: "border-green-100" }
-    : bestDeal.saleStory
-    ? { bg: "bg-orange-50", border: "border-orange-200", heading: "text-orange-800",
-        price: "text-orange-700", divider: "border-orange-100" }
     : { bg: "bg-gray-50", border: "border-gray-200", heading: "text-gray-700",
         price: "text-gray-800", divider: "border-gray-100" };
 
