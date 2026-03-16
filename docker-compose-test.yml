@@ -1,0 +1,26 @@
+services:
+  grocery-tracker-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grocery-tracker:test
+    container_name: grocery-tracker-test
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=file:/data/prices.db
+      - NODE_ENV=production
+      - FLIPP_POSTAL_CODE=N2B3J1
+    volumes:
+      - db-data-test:/data
+    ports:
+      - "7801:7800"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:7800/api/stores"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  db-data-test:
+    driver: local
