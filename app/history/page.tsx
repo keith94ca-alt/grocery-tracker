@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { HistoryEntrySkeleton } from "@/components/Skeletons";
 
 interface Entry {
   id: number;
@@ -41,9 +42,14 @@ export default function HistoryPage() {
 
   if (loading) {
     return (
-      <div className="px-4 py-8 text-center text-gray-500 animate-pulse">
-        <p className="text-4xl">⏳</p>
-        <p className="mt-2">Loading history…</p>
+      <div className="px-4 py-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900">Price History</h2>
+          <div className="h-5 w-20 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => <HistoryEntrySkeleton key={i} />)}
+        </div>
       </div>
     );
   }

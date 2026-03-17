@@ -8,7 +8,7 @@ const navItems = [
   { href: "/flyer", label: "Flyer", icon: "🏷️" },
   { href: "/add", label: "Add", icon: "➕" },
   { href: "/items", label: "Items", icon: "📦" },
-  { href: "/history", label: "History", icon: "📋" },
+  { href: "/list", label: "List", icon: "🛒" },
 ];
 
 export default function BottomNav() {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import type { DealResult } from "@/app/api/flyer-deals/route";
+import { ItemCardSkeleton } from "@/components/Skeletons";
 
 interface ItemStat {
   avg: number;
@@ -325,8 +326,8 @@ export default function SearchPage() {
             </div>
 
             {itemsLoading ? (
-              <div className="text-center py-8 text-gray-400">
-                <div className="text-4xl animate-pulse">⏳</div>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => <ItemCardSkeleton key={i} />)}
               </div>
             ) : filteredItems.length === 0 ? (
               selectedCategory ? (

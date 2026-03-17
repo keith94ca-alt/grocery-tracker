@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
+import { ItemCardSkeleton } from "@/components/Skeletons";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -398,8 +399,8 @@ export default function ItemsPage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">
-          <div className="text-4xl animate-pulse">⏳</div>
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => <ItemCardSkeleton key={i} />)}
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-12 text-gray-400">

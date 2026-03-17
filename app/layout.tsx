@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
+import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -40,7 +41,9 @@ export default function RootLayout({
               <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
             </div>
           </header>
-          <main className="max-w-lg mx-auto">{children}</main>
+          <main className="max-w-lg mx-auto">
+            <ClientLayout>{children}</ClientLayout>
+          </main>
         </div>
         <BottomNav />
         <ServiceWorkerRegistrar />

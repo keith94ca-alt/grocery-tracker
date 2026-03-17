@@ -5,6 +5,7 @@ import Link from "next/link";
 import { simplifyFlyerName } from "@/lib/flipp";
 import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route";
 import type { FlippItem } from "@/lib/flipp";
+import { FlyerCardSkeleton } from "@/components/Skeletons";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
@@ -462,16 +463,42 @@ function FlyerCard({
         {added ? (
           <span className="mt-2 inline-block text-xs text-green-600 font-semibold">✓ Added</span>
         ) : (
-          <button
-            onClick={onAction}
-            className={`mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-              trackedMatch
-                ? "bg-brand-100 text-brand-700"
-                : "bg-orange-100 text-orange-700"
-            }`}
-          >
-            {trackedMatch ? "Compare" : "Track This"}
-          </button>
+          <div className="mt-2 flex gap-1.5">
+            <button
+              onClick={onAction}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                trackedMatch
+                  ? "bg-brand-100 text-brand-700"
+                  : "bg-orange-100 text-orange-700"
+              }`}
+            >
+              {trackedMatch ? "Compare" : "Track This"}
+            </button>
+            <button
+              onClick={() => {
+                // Add to shopping list via localStorage
+                try {
+                  const raw = localStorage.getItem("grocery-shopping-list");
+                  const list: { id: string; name: string; checked: boolean; category: string; addedAt: number }[] = raw ? JSON.parse(raw) : [];
+                  const name = trackedMatch?.name ?? simplifyFlyerName(flippItem.name);
+                  if (!list.some((i) => i.name.toLowerCase() === name.toLowerCase() && !i.checked)) {
+                    list.unshift({
+                      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                      name,
+                      checked: false,
+                      category: trackedMatch?.category ?? "Other",
+                      addedAt: Date.now(),
+                    });
+                    localStorage.setItem("grocery-shopping-list", JSON.stringify(list));
+                  }
+                } catch { /* ignore */ }
+              }}
+              className="px-2 py-1.5 rounded-lg text-xs bg-gray-100 hover:bg-brand-100 hover:text-brand-700 transition-colors"
+              title="Add to shopping list"
+            >
+              🛒
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -618,10 +645,8 @@ export default function FlyerPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="text-center py-16 text-gray-400 space-y-2">
-          <div className="text-5xl animate-pulse">🏷️</div>
-          <p className="text-sm">Loading this week&apos;s flyers…</p>
-          <p className="text-xs text-gray-400">First load may take a few seconds</p>
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => <FlyerCardSkeleton key={i} />)}
         </div>
       ) : displayed.length === 0 ? (
         <div className="text-center py-12 text-gray-400">

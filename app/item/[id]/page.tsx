@@ -6,6 +6,7 @@ import Link from "next/link";
 import { convertUnitPrice, sameUnitGroup } from "@/lib/units";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
+import PriceChart from "@/components/PriceChart";
 
 interface PriceEntry {
   id: number;
@@ -357,10 +358,34 @@ export default function ItemPage() {
           <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
           <p className="text-sm text-gray-500">{item.category}</p>
         </div>
-        <Link href={`/add?item=${encodeURIComponent(item.name)}`}
-          className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">
-          + Add
-        </Link>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              try {
+                const raw = localStorage.getItem("grocery-shopping-list");
+                const list: { id: string; name: string; checked: boolean; category: string; addedAt: number }[] = raw ? JSON.parse(raw) : [];
+                if (!list.some((i) => i.name.toLowerCase() === item.name.toLowerCase() && !i.checked)) {
+                  list.unshift({
+                    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                    name: item.name,
+                    checked: false,
+                    category: item.category,
+                    addedAt: Date.now(),
+                  });
+                  localStorage.setItem("grocery-shopping-list", JSON.stringify(list));
+                }
+              } catch { /* ignore */ }
+            }}
+            className="px-3 py-1.5 bg-gray-100 hover:bg-brand-100 text-gray-700 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors"
+            title="Add to shopping list"
+          >
+            🛒
+          </button>
+          <Link href={`/add?item=${encodeURIComponent(item.name)}`}
+            className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-medium">
+            + Add
+          </Link>
+        </div>
       </div>
 
       {/* Flyer deal banner — appears when Flipp has a match */}
@@ -398,6 +423,81 @@ export default function ItemPage() {
           Stats normalized to <strong>{canonicalUnit}</strong> for fair comparison
         </p>
       )}
+
+      {/* Price trend chart */}
+      {item.priceEntries.length >= 2 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Price Trend
+          </h3>
+          <PriceChart entries={item.priceEntries} />
+        </div>
+      )}
+
+      {/* Store comparison */}
+      {item.priceEntries.length >= 2 && (() => {
+        // Group by store, compute average unit price per store
+        const storeMap = new Map<string, { total: number; count: number; best: number }>();
+        item.priceEntries.forEach((entry) => {
+          const store = entry.store || "Unknown";
+          const existing = storeMap.get(store) || { total: 0, count: 0, best: Infinity };
+          existing.total += entry.unitPrice;
+          existing.count += 1;
+          existing.best = Math.min(existing.best, entry.unitPrice);
+          storeMap.set(store, existing);
+        });
+
+        if (storeMap.size < 2) return null;
+
+        const storeStats = Array.from(storeMap.entries())
+          .map(([store, data]) => ({
+            store,
+            avg: data.total / data.count,
+            best: data.best,
+            count: data.count,
+          }))
+          .sort((a, b) => a.best - b.best);
+
+        const cheapestStore = storeStats[0];
+
+        return (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              🏪 Store Comparison
+            </h3>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {storeStats.map((s, idx) => (
+                <div
+                  key={s.store}
+                  className={`flex items-center justify-between px-4 py-3 ${
+                    idx === 0 ? "bg-green-50" : ""
+                  } ${idx < storeStats.length - 1 ? "border-b border-gray-100" : ""}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {idx === 0 && <span className="text-sm">👑</span>}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{s.store}</p>
+                      <p className="text-xs text-gray-400">{s.count} {s.count === 1 ? "entry" : "entries"}</p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-sm font-bold ${idx === 0 ? "text-green-700" : "text-gray-700"}`}>
+                      ${s.best.toFixed(2)}
+                      <span className="text-xs font-normal text-gray-400"> best</span>
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      ${s.avg.toFixed(2)} avg
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-center text-gray-400 mt-1">
+              Cheapest: <strong className="text-green-600">{cheapestStore.store}</strong> at ${cheapestStore.best.toFixed(2)}/{canonicalUnit.replace("per ", "")}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Price history */}
       <div>
