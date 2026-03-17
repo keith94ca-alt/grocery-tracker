@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import type { DealResult } from "@/app/api/flyer-deals/route";
+import type { FlyerMatch } from "@/app/api/flyer-match/route";
 
 interface ShoppingItem {
   id: string;
@@ -59,6 +60,7 @@ export default function ShoppingListPage() {
   const [suggestions, setSuggestions] = useState<{ id: number; name: string; category: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
+  const [untrackedFlyerDeals, setUntrackedFlyerDeals] = useState<Map<string, FlyerMatch>>(new Map());
   const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
@@ -103,6 +105,33 @@ export default function ShoppingListPage() {
       })
       .catch(() => {});
   }, []);
+
+  // After items load, check flyer deals for untracked items
+  useEffect(() => {
+    if (items.length === 0) return;
+    const trackedLower = new Set(Array.from(flyerDeals.keys()));
+    const toCheck = items.filter((i) => !trackedLower.has(i.name.toLowerCase()));
+    if (toCheck.length === 0) return;
+
+    let cancelled = false;
+    async function checkUntracked() {
+      const results = new Map<string, FlyerMatch>();
+      for (const item of toCheck.slice(0, 20)) {
+        try {
+          const res = await fetch(`/api/flyer-match?name=${encodeURIComponent(item.name)}`);
+          const data: FlyerMatch[] = await res.json();
+          if (Array.isArray(data) && data.length > 0 && !cancelled) {
+            results.set(item.name.toLowerCase(), data[0]);
+          }
+        } catch {}
+      }
+      if (!cancelled && results.size > 0) {
+        setUntrackedFlyerDeals(results);
+      }
+    }
+    checkUntracked();
+    return () => { cancelled = true; };
+  }, [items, flyerDeals]);
 
   function handleNameChange(val: string) {
     setNewName(val);
@@ -247,7 +276,7 @@ export default function ShoppingListPage() {
 
   function clearAll() { setItems([]); }
 
-  // Find best flyer deal for an item (fuzzy match by name)
+  // Find best flyer deal for an item (tracked items)
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
     const exact = flyerDeals.get(lower);
@@ -256,6 +285,11 @@ export default function ShoppingListPage() {
       if (lower.includes(key) || key.includes(lower)) return deal;
     }
     return undefined;
+  }
+
+  // Find flyer deal for untracked items (direct flyer match)
+  function findUntrackedFlyerDeal(itemName: string): FlyerMatch | undefined {
+    return untrackedFlyerDeals.get(itemName.toLowerCase());
   }
 
   // Find cheapest normal price for an item
@@ -415,8 +449,9 @@ export default function ShoppingListPage() {
             <div key={category} className="space-y-1">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">{category}</h3>
               {catItems.map((item) => {
-                const deal = !item.checked ? findFlyerDeal(item.name) : undefined;
-                const normalPrice = !item.checked && !deal ? findNormalPrice(item.name) : undefined;
+                const trackedDeal = !item.checked ? findFlyerDeal(item.name) : undefined;
+                const untrackedDeal = !item.checked && !trackedDeal ? findUntrackedFlyerDeal(item.name) : undefined;
+                const normalPrice = !item.checked && !trackedDeal && !untrackedDeal ? findNormalPrice(item.name) : undefined;
                 const form = priceForms.get(item.id);
                 const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
                   ? (parseFloat(form.price) / parseFloat(form.quantity || "1")).toFixed(2)
@@ -452,35 +487,59 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {/* Flyer deal line — clickable */}
-                        {deal && !item.checked && (
+                        {/* Tracked flyer deal — clickable */}
+                        {trackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
                             <button
                               onClick={() => {
-                                if (deal.bestDeal.imageUrl) {
-                                  setLightboxImg({ src: deal.bestDeal.imageUrl, alt: deal.bestDeal.name });
+                                if (trackedDeal.bestDeal.imageUrl) {
+                                  setLightboxImg({ src: trackedDeal.bestDeal.imageUrl, alt: trackedDeal.bestDeal.name });
                                 } else {
                                   window.open(
-                                    deal.bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(deal.bestDeal.name)}`,
+                                    trackedDeal.bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(trackedDeal.bestDeal.name)}`,
                                     "_blank"
                                   );
                                 }
                               }}
                               className="text-xs text-green-700 font-medium hover:underline flex items-center gap-1"
                             >
-                              🏷️ ${deal.bestDeal.currentPrice.toFixed(2)}
-                              {deal.flyerUnitPrice && deal.flyerUnit
-                                ? ` ($${deal.flyerUnitPrice.toFixed(2)}/${deal.flyerUnit.replace("per ", "")})`
+                              🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
+                              {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
+                                ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
                                 : ""}
-                              {" "}{deal.bestDeal.merchantName}
+                              {" "}{trackedDeal.bestDeal.merchantName}
                             </button>
-                            {deal.savingsPercent && (
-                              <span className="text-xs text-green-600">↓{deal.savingsPercent}%</span>
+                            {trackedDeal.savingsPercent && (
+                              <span className="text-xs text-green-600">↓{trackedDeal.savingsPercent}%</span>
                             )}
                           </div>
                         )}
+                        {/* Untracked flyer deal — clickable */}
+                        {!trackedDeal && untrackedDeal && !item.checked && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <button
+                              onClick={() => {
+                                if (untrackedDeal.imageUrl) {
+                                  setLightboxImg({ src: untrackedDeal.imageUrl, alt: untrackedDeal.name });
+                                } else {
+                                  window.open(
+                                    untrackedDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(untrackedDeal.name)}`,
+                                    "_blank"
+                                  );
+                                }
+                              }}
+                              className="text-xs text-green-700 font-medium hover:underline flex items-center gap-1"
+                            >
+                              🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
+                              {untrackedDeal.unitPrice && untrackedDeal.unit
+                                ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
+                                : ""}
+                              {" "}{untrackedDeal.merchantName}
+                            </button>
+                          </div>
+                        )}
                         {/* Cheapest normal price line (when no flyer deal) */}
-                        {!deal && !item.checked && normalPrice && (
+                        {!trackedDeal && !untrackedDeal && !item.checked && normalPrice && (
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-gray-500">
                               🏪 Normal ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} at {normalPrice.store}

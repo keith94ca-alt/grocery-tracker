@@ -281,9 +281,10 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   if (union === 0 || intersect / union < 0.35) return false;
 
   // Stage 3 — tracked keywords must cover at least 50% of flyer keywords
-  // If the flyer name has many extra keywords, it's likely a different product variant
-  // e.g. "Chicken Breast" (2) vs "Chicken Breast Roast" (3) → 2/3 = 0.67 → OK
-  // e.g. "Chicken Breast" (2) vs "Maple Lodge Chicken Breast Roast" (5) → 2/5 = 0.40 → reject
+  // Skip this check for single-keyword tracked items (e.g. "Tortilla") since
+  // compound flyer deals (e.g. "Bread Or Tortillas") inflate keyword count
+  if (trackedKw.size <= 1) return true;
+
   const coverage = intersect / flippKw.size;
   return coverage >= 0.5;
 }
