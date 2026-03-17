@@ -61,6 +61,7 @@ export default function ShoppingListPage() {
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
   const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
+  const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -451,16 +452,28 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {/* Flyer deal line */}
+                        {/* Flyer deal line — clickable */}
                         {deal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 font-medium">
+                            <button
+                              onClick={() => {
+                                if (deal.bestDeal.imageUrl) {
+                                  setLightboxImg({ src: deal.bestDeal.imageUrl, alt: deal.bestDeal.name });
+                                } else {
+                                  window.open(
+                                    deal.bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(deal.bestDeal.name)}`,
+                                    "_blank"
+                                  );
+                                }
+                              }}
+                              className="text-xs text-green-700 font-medium hover:underline flex items-center gap-1"
+                            >
                               🏷️ ${deal.bestDeal.currentPrice.toFixed(2)}
                               {deal.flyerUnitPrice && deal.flyerUnit
                                 ? ` ($${deal.flyerUnitPrice.toFixed(2)}/${deal.flyerUnit.replace("per ", "")})`
                                 : ""}
                               {" "}{deal.bestDeal.merchantName}
-                            </span>
+                            </button>
                             {deal.savingsPercent && (
                               <span className="text-xs text-green-600">↓{deal.savingsPercent}%</span>
                             )}
@@ -595,6 +608,21 @@ export default function ShoppingListPage() {
             Clear entire list
           </button>
         </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxImg && (
+        <>
+          <div className="fixed inset-0 bg-black/70 z-[80]" onClick={() => setLightboxImg(null)} />
+          <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={() => setLightboxImg(null)}>
+            <img
+              src={lightboxImg.src}
+              alt={lightboxImg.alt}
+              className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </>
       )}
     </div>
   );
