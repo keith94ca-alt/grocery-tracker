@@ -334,6 +334,17 @@ export default function ShoppingListPage() {
         )}
       </div>
 
+      {/* Clear all — top of list */}
+      {items.length > 0 && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-500">{items.length} {items.length === 1 ? "item" : "items"} · {uncheckedCount} to buy</span>
+          <button onClick={clearAll}
+            className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
+            Clear all
+          </button>
+        </div>
+      )}
+
       {/* Category filter */}
       {activeCategories.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
@@ -415,7 +426,11 @@ export default function ShoppingListPage() {
                         {deal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-green-700 font-medium">
-                              🏷️ ${deal.bestDeal.currentPrice.toFixed(2)} at {deal.bestDeal.merchantName}
+                              🏷️ ${deal.bestDeal.currentPrice.toFixed(2)}
+                              {deal.flyerUnitPrice && deal.flyerUnit
+                                ? ` ($${deal.flyerUnitPrice.toFixed(2)}/${deal.flyerUnit.replace("per ", "")})`
+                                : ""}
+                              {" "}{deal.bestDeal.merchantName}
                             </span>
                             {deal.savingsPercent && (
                               <span className="text-xs text-green-600">↓{deal.savingsPercent}%</span>
@@ -426,21 +441,24 @@ export default function ShoppingListPage() {
 
                       {/* Actions */}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Expand/collapse price form */}
+                        {/* Expand/collapse price form — arrow indicates collapsible */}
                         {item.checked && !item.priceLogged && (
                           <button
                             onClick={() => togglePriceForm(item.id)}
                             className="px-2 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
                           >
-                            {item.priceExpanded ? "✕" : "💰"}
+                            {item.priceExpanded ? "▾" : "💰"}
                           </button>
                         )}
                         {item.priceLogged && <span className="text-xs text-green-600">✅</span>}
-                        <button onClick={() => removeItem(item.id)}
-                          className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
-                          title="Remove">
-                          ×
-                        </button>
+                        {/* Remove button — hidden when price form is expanded */}
+                        {!item.priceExpanded && (
+                          <button onClick={() => removeItem(item.id)}
+                            className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
+                            title="Remove">
+                            ×
+                          </button>
+                        )}
                       </div>
                     </div>
 
