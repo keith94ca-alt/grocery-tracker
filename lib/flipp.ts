@@ -255,15 +255,13 @@ function fuzzyIntersect(a: Set<string>, b: Set<string>): number {
 /**
  * Returns true if `flippName` is a meaningful match for a tracked item named `trackedName`.
  *
- * Two-stage check:
+ * Three-stage check:
  *  1. ALL keywords from the tracked name must appear in the Flipp name.
- *     Ensures "Whole Milk" only matches flyer items that contain the word "whole".
- *     Ensures "Ground Beef" only matches items with both "ground" and "beef".
- *
  *  2. Bidirectional Jaccard similarity ≥ 0.35 prevents a short tracked name
  *     like "Chicken" from matching a very different product ("Chicken Burger Nuggets").
- *       "Chicken" vs "Chicken Breast"         → Jaccard 0.50 → ✅ match
- *       "Chicken" vs "Chicken Burger Nuggets" → Jaccard 0.25 → ❌ rejected
+ *  3. Tracked keywords must cover ≥ 50% of flyer keywords — prevents "Chicken Breast"
+ *     matching "Chicken Breast Roast" or "Chicken Breast Canned" where extra keywords
+ *     indicate a different product variant.
  */
 export function matchesTrackedItem(flippName: string, trackedName: string): boolean {
   const flippKw = keyWords(flippName);
@@ -280,7 +278,14 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   // Stage 2 — bidirectional Jaccard similarity
   const intersect = fuzzyIntersect(trackedKw, flippKw);
   const union = trackedKw.size + flippKw.size - intersect;
-  return union > 0 && intersect / union >= 0.35;
+  if (union === 0 || intersect / union < 0.35) return false;
+
+  // Stage 3 — tracked keywords must cover at least 50% of flyer keywords
+  // If the flyer name has many extra keywords, it's likely a different product variant
+  // e.g. "Chicken Breast" (2) vs "Chicken Breast Roast" (3) → 2/3 = 0.67 → OK
+  // e.g. "Chicken Breast" (2) vs "Maple Lodge Chicken Breast Roast" (5) → 2/5 = 0.40 → reject
+  const coverage = intersect / flippKw.size;
+  return coverage >= 0.5;
 }
 
 /** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */
