@@ -8,11 +8,17 @@ interface PricePoint {
   store: string;
 }
 
+/** Pick up to 5 evenly-spaced indices from the sorted array for x-axis labels */
+function pickDateIndices(count: number): number[] {
+  if (count <= 5) return Array.from({ length: count }, (_, i) => i);
+  const step = (count - 1) / 4;
+  return [0, 1, 2, 3, 4].map((i) => Math.round(i * step));
+}
+
 export default function PriceChart({ entries }: { entries: PricePoint[] }) {
   const chartData = useMemo(() => {
     if (entries.length < 2) return null;
 
-    // Sort chronologically (oldest first)
     const sorted = [...entries].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
@@ -21,17 +27,18 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     const min = Math.min(...prices);
     const max = Math.max(...prices);
     const range = max - min || 1;
-    // Add 10% padding
     const paddedMin = min - range * 0.1;
     const paddedMax = max + range * 0.1;
     const paddedRange = paddedMax - paddedMin;
 
-    const width = 320;
-    const height = 120;
-    const paddingX = 8;
+    // Wider viewBox for better readability, taller to fit x-axis dates
+    const width = 500;
+    const height = 160;
+    const paddingX = 50;
     const paddingY = 12;
+    const paddingBottom = 30; // extra space for date labels
     const chartW = width - paddingX * 2;
-    const chartH = height - paddingY * 2;
+    const chartH = height - paddingY - paddingBottom;
 
     const points = sorted.map((entry, i) => {
       const x = paddingX + (i / (sorted.length - 1)) * chartW;
@@ -39,17 +46,17 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       return { x, y, entry };
     });
 
-    // Build SVG path
     const pathD = points
       .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
       .join(" ");
 
-    // Area fill path
-    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${height - paddingY} L ${points[0].x.toFixed(1)} ${height - paddingY} Z`;
+    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(1)} ${height - paddingBottom} L ${points[0].x.toFixed(1)} ${height - paddingBottom} Z`;
 
-    // Average line
     const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
     const avgY = paddingY + (1 - (avg - paddedMin) / paddedRange) * chartH;
+
+    // Date label positions
+    const dateIndices = pickDateIndices(sorted.length);
 
     return {
       points,
@@ -57,6 +64,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       areaD,
       width,
       height,
+      paddingBottom,
       avgY,
       avg,
       min,
@@ -64,6 +72,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       paddedMin,
       paddedMax,
       sorted,
+      dateIndices,
     };
   }, [entries]);
 
@@ -75,14 +84,16 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     );
   }
 
-  const { points, pathD, areaD, width, height, avgY, avg, min, max, sorted } = chartData;
+  const { points, pathD, areaD, width, height, paddingBottom, avgY, avg, min, max, sorted, dateIndices } = chartData;
 
-  // Format date for tooltip
   function formatDateShort(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
   }
 
-  // Determine trend direction
+  function formatDateMedium(dateStr: string) {
+    return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "2-digit" });
+  }
+
   const firstPrice = sorted[0].unitPrice;
   const lastPrice = sorted[sorted.length - 1].unitPrice;
   const trendUp = lastPrice > firstPrice;
@@ -102,24 +113,24 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="bg-gray-50 rounded-xl p-3 -mx-1">
+      {/* Chart — responsive, bigger on desktop */}
+      <div className="bg-gray-50 rounded-xl p-4 -mx-1 lg:mx-0">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full"
-          style={{ height: "auto", maxHeight: 140 }}
+          style={{ height: "auto", maxHeight: "clamp(160px, 25vw, 320px)" }}
         >
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
-            const y = 12 + pct * (height - 24);
+            const y = 12 + pct * (height - paddingBottom - 12);
             const price = chartData.paddedMax - pct * (chartData.paddedMax - chartData.paddedMin);
             return (
               <g key={pct}>
                 <line
-                  x1={8} y1={y} x2={width - 8} y2={y}
+                  x1={paddingX} y1={y} x2={width - paddingX} y2={y}
                   stroke="#e5e7eb" strokeWidth={1}
                 />
-                <text x={4} y={y + 3} fontSize={7} fill="#9ca3af">
+                <text x={paddingX - 4} y={y + 3} fontSize={8} fill="#9ca3af" textAnchor="end">
                   ${price.toFixed(2)}
                 </text>
               </g>
@@ -128,10 +139,10 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
 
           {/* Average line */}
           <line
-            x1={8} y1={avgY} x2={width - 8} y2={avgY}
+            x1={paddingX} y1={avgY} x2={width - paddingX} y2={avgY}
             stroke="#f59e0b" strokeWidth={1} strokeDasharray="4,3"
           />
-          <text x={width - 6} y={avgY - 3} fontSize={7} fill="#f59e0b" textAnchor="end">
+          <text x={width - paddingX - 4} y={avgY - 4} fontSize={8} fill="#f59e0b" textAnchor="end">
             avg ${avg.toFixed(2)}
           </text>
 
@@ -146,7 +157,31 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
             <circle key={i} cx={p.x} cy={p.y} r={3} fill="#16a34a" stroke="white" strokeWidth={1.5} />
           ))}
 
-          {/* Gradient definition */}
+          {/* Date labels on x-axis */}
+          {dateIndices.map((idx) => {
+            const p = points[idx];
+            if (!p) return null;
+            return (
+              <text
+                key={idx}
+                x={p.x}
+                y={height - 4}
+                fontSize={8}
+                fill="#6b7280"
+                textAnchor="middle"
+              >
+                {formatDateMedium(p.entry.date)}
+              </text>
+            );
+          })}
+
+          {/* Bottom axis line */}
+          <line
+            x1={paddingX} y1={height - paddingBottom}
+            x2={width - paddingX} y2={height - paddingBottom}
+            stroke="#d1d5db" strokeWidth={1}
+          />
+
           <defs>
             <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#16a34a" />
