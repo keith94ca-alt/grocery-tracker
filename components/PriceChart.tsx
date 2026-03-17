@@ -15,6 +15,8 @@ function pickDateIndices(count: number): number[] {
   return [0, 1, 2, 3, 4].map((i) => Math.round(i * step));
 }
 
+const PADDING_X = 50;
+
 export default function PriceChart({ entries }: { entries: PricePoint[] }) {
   const chartData = useMemo(() => {
     if (entries.length < 2) return null;
@@ -34,14 +36,14 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     // Wider viewBox for better readability, taller to fit x-axis dates
     const width = 500;
     const height = 160;
-    const paddingX = 50;
+    
     const paddingY = 12;
     const paddingBottom = 30; // extra space for date labels
-    const chartW = width - paddingX * 2;
+    const chartW = width - PADDING_X * 2;
     const chartH = height - paddingY - paddingBottom;
 
     const points = sorted.map((entry, i) => {
-      const x = paddingX + (i / (sorted.length - 1)) * chartW;
+      const x = PADDING_X + (i / (sorted.length - 1)) * chartW;
       const y = paddingY + (1 - (entry.unitPrice - paddedMin) / paddedRange) * chartH;
       return { x, y, entry };
     });
@@ -127,10 +129,10 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
             return (
               <g key={pct}>
                 <line
-                  x1={paddingX} y1={y} x2={width - paddingX} y2={y}
+                  x1={PADDING_X} y1={y} x2={width - PADDING_X} y2={y}
                   stroke="#e5e7eb" strokeWidth={1}
                 />
-                <text x={paddingX - 4} y={y + 3} fontSize={8} fill="#9ca3af" textAnchor="end">
+                <text x={PADDING_X - 4} y={y + 3} fontSize={8} fill="#9ca3af" textAnchor="end">
                   ${price.toFixed(2)}
                 </text>
               </g>
@@ -139,10 +141,10 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
 
           {/* Average line */}
           <line
-            x1={paddingX} y1={avgY} x2={width - paddingX} y2={avgY}
+            x1={PADDING_X} y1={avgY} x2={width - PADDING_X} y2={avgY}
             stroke="#f59e0b" strokeWidth={1} strokeDasharray="4,3"
           />
-          <text x={width - paddingX - 4} y={avgY - 4} fontSize={8} fill="#f59e0b" textAnchor="end">
+          <text x={width - PADDING_X - 4} y={avgY - 4} fontSize={8} fill="#f59e0b" textAnchor="end">
             avg ${avg.toFixed(2)}
           </text>
 
@@ -177,8 +179,8 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
 
           {/* Bottom axis line */}
           <line
-            x1={paddingX} y1={height - paddingBottom}
-            x2={width - paddingX} y2={height - paddingBottom}
+            x1={PADDING_X} y1={height - paddingBottom}
+            x2={width - PADDING_X} y2={height - paddingBottom}
             stroke="#d1d5db" strokeWidth={1}
           />
 
