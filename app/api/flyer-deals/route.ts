@@ -68,54 +68,57 @@ export async function GET(request: NextRequest) {
         ? normalEntries
         : item.priceEntries.filter((e) => e.source === "manual" || e.source === "receipt");
 
-      if (baselineEntries.length === 0) continue;
-
-      // Find the cheapest normal price across all stores
-      let cheapestNormal = baselineEntries[0];
-      let cheapestNorm = normalizePrice(cheapestNormal.unitPrice, cheapestNormal.unit || item.unit);
-      let cheapestStore = cheapestNormal.store;
-
-      for (const entry of baselineEntries) {
-        const norm = normalizePrice(entry.unitPrice, entry.unit || item.unit);
-        if (sameUnitGroup(norm.unit, cheapestNorm.unit) && norm.price < cheapestNorm.price) {
-          cheapestNormal = entry;
-          cheapestNorm = norm;
-          cheapestStore = entry.store;
-        }
-      }
-
       const best = matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
 
+      // Compute normal price comparison only if baseline entries exist
+      let cheapestNorm: { price: number; unit: string } | null = null;
+      let cheapestStore: string | null = null;
+      let isCheaper = false;
+      let savingsPercent: number | null = null;
+
+      // Flyer note and flyer norm — needed for both watchlist and tracked items
       const noteKey = `${item.id}:${best.id}:${best.merchantName}`;
       const flyerNote = flyerNoteMap.get(noteKey);
-
       const flyerNorm = flyerNote
         ? normalizePrice(flyerNote.unitPrice, flyerNote.unit)
         : (best.unitPrice && best.unit)
         ? normalizePrice(best.unitPrice, best.unit)
         : null;
 
-      let isCheaper = false;
-      let savingsPercent: number | null = null;
+      if (baselineEntries.length > 0) {
+        cheapestNorm = normalizePrice(baselineEntries[0].unitPrice, baselineEntries[0].unit || item.unit);
+        cheapestStore = baselineEntries[0].store;
 
-      if (
-        flyerNorm &&
-        cheapestNorm &&
-        sameUnitGroup(flyerNorm.unit, cheapestNorm.unit)
-      ) {
-        isCheaper = flyerNorm.price < cheapestNorm.price;
-        if (isCheaper) {
-          savingsPercent = Math.round((1 - flyerNorm.price / cheapestNorm.price) * 100);
+        for (const entry of baselineEntries) {
+          const norm = normalizePrice(entry.unitPrice, entry.unit || item.unit);
+          if (sameUnitGroup(norm.unit, cheapestNorm.unit) && norm.price < cheapestNorm.price) {
+            cheapestNorm = norm;
+            cheapestStore = entry.store;
+          }
         }
-      } else if (
-        !flyerNorm &&
-        cheapestNorm &&
-        (cheapestNorm.unit === "each" || cheapestNorm.unit === "per pack")
-      ) {
-        isCheaper = best.currentPrice < cheapestNormal.price;
-        if (isCheaper) {
-          savingsPercent = Math.round((1 - best.currentPrice / cheapestNormal.price) * 100);
+
+        if (
+          flyerNorm &&
+          cheapestNorm &&
+          sameUnitGroup(flyerNorm.unit, cheapestNorm.unit)
+        ) {
+          isCheaper = flyerNorm.price < cheapestNorm.price;
+          if (isCheaper) {
+            savingsPercent = Math.round((1 - flyerNorm.price / cheapestNorm.price) * 100);
+          }
+        } else if (
+          !flyerNorm &&
+          cheapestNorm &&
+          (cheapestNorm.unit === "each" || cheapestNorm.unit === "per pack")
+        ) {
+          isCheaper = best.currentPrice < cheapestNorm.price;
+          if (isCheaper) {
+            savingsPercent = Math.round((1 - best.currentPrice / cheapestNorm.price) * 100);
+          }
         }
+      } else {
+        // No price history — show flyer deal anyway (watchlist items without history)
+        isCheaper = true;
       }
 
       const enrichedDeals = matches.map((m) => {
