@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
 
@@ -64,6 +65,7 @@ export default function ShoppingListPage() {
   const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: "clearChecked" | "clearAll" | "removeItem"; itemId?: string; itemName?: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -332,7 +334,7 @@ export default function ShoppingListPage() {
             <>
               <span className="text-sm text-gray-500">{uncheckedCount} to buy</span>
               {checkedCount > 0 && (
-                <button onClick={clearChecked}
+                <button onClick={() => setConfirmAction({ type: "clearChecked" })}
                   className="text-xs text-red-500 font-medium hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">
                   Clear ✓ ({checkedCount}{loggedCount > 0 ? ` · ${loggedCount} logged` : ""})
                 </button>
@@ -401,7 +403,7 @@ export default function ShoppingListPage() {
       {items.length > 0 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">{items.length} {items.length === 1 ? "item" : "items"} · {uncheckedCount} to buy</span>
-          <button onClick={clearAll}
+          <button onClick={() => setConfirmAction({ type: "clearAll" })}
             className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
             Clear all
           </button>
@@ -562,7 +564,7 @@ export default function ShoppingListPage() {
                         {item.priceLogged && <span className="text-xs text-green-600">✅</span>}
                         {/* Remove button — hidden when price form is expanded */}
                         {!item.priceExpanded && (
-                          <button onClick={() => removeItem(item.id)}
+                          <button onClick={() => setConfirmAction({ type: "removeItem", itemId: item.id, itemName: item.name })}
                             className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
                             title="Remove">
                             ×
@@ -663,7 +665,7 @@ export default function ShoppingListPage() {
       {/* Clear all */}
       {items.length > 0 && (
         <div className="pt-4 border-t border-gray-100 text-center">
-          <button onClick={clearAll} className="text-sm text-gray-400 hover:text-red-500 font-medium">
+          <button onClick={() => setConfirmAction({ type: "clearAll" })} className="text-sm text-gray-400 hover:text-red-500 font-medium">
             Clear entire list
           </button>
         </div>
@@ -682,6 +684,34 @@ export default function ShoppingListPage() {
             />
           </div>
         </>
+      )}
+
+      {/* Confirm dialogs */}
+      {confirmAction && (
+        <ConfirmDialog
+          title={
+            confirmAction.type === "clearAll" ? "Clear Entire List?" :
+            confirmAction.type === "clearChecked" ? "Clear Checked Items?" :
+            "Remove Item?"
+          }
+          message={
+            confirmAction.type === "clearAll"
+              ? `This will remove all ${items.length} items from your shopping list. Items that have prices logged will still be tracked in your price history.`
+              : confirmAction.type === "clearChecked"
+              ? `This will remove ${checkedCount} checked item${checkedCount !== 1 ? "s" : ""} from your list. ${loggedCount > 0 ? `${loggedCount} with logged prices will stay in your price history. ` : ""}Items without prices will be deleted.`
+              : `"${confirmAction.itemName}" will be removed from your shopping list. If you've logged a price for it, the price history will remain.`
+          }
+          confirmLabel={
+            confirmAction.type === "removeItem" ? "Remove" : "Clear"
+          }
+          onConfirm={() => {
+            if (confirmAction.type === "clearAll") clearAll();
+            else if (confirmAction.type === "clearChecked") clearChecked();
+            else if (confirmAction.itemId) removeItem(confirmAction.itemId);
+            setConfirmAction(null);
+          }}
+          onCancel={() => setConfirmAction(null)}
+        />
       )}
     </div>
   );

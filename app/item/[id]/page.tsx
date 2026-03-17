@@ -8,6 +8,7 @@ import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
 import PriceChart from "@/components/PriceChart";
 import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface PriceEntry {
   id: number;
@@ -291,6 +292,7 @@ export default function ItemPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<PriceEntry | null>(null);
   const [deal, setDeal] = useState<DealResult | null>(null);
   const [allDeals, setAllDeals] = useState<FlippItem[]>([]);
   const [showDealsModal, setShowDealsModal] = useState(false);
@@ -654,7 +656,7 @@ export default function ItemPage() {
                     )}
                     {entry.notes && <p className="text-xs text-gray-500 mt-1 italic">{entry.notes}</p>}
                   </div>
-                  <button onClick={() => deleteEntry(entry.id)} disabled={deletingId === entry.id}
+                  <button onClick={() => setConfirmDeleteEntry(entry)} disabled={deletingId === entry.id}
                     className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors disabled:opacity-50"
                     title="Delete entry">
                     ×
@@ -668,6 +670,17 @@ export default function ItemPage() {
 
       {/* All Flyer Deals Modal */}
       {showDealsModal && <AllDealsModal deals={allDeals} onClose={() => setShowDealsModal(false)} />}
+
+      {/* Confirm delete price entry */}
+      {confirmDeleteEntry && (
+        <ConfirmDialog
+          title="Delete Price Entry?"
+          message={`This will permanently delete the $${confirmDeleteEntry.unitPrice.toFixed(2)}/${confirmDeleteEntry.unit || "each"} entry from ${confirmDeleteEntry.store} on ${new Date(confirmDeleteEntry.date).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "numeric" })}. Your price history and averages will be recalculated.`}
+          confirmLabel="Delete"
+          onConfirm={() => { deleteEntry(confirmDeleteEntry.id); setConfirmDeleteEntry(null); }}
+          onCancel={() => setConfirmDeleteEntry(null)}
+        />
+      )}
     </div>
   );
 }

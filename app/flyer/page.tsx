@@ -7,6 +7,7 @@ import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route"
 import type { FlippItem } from "@/lib/flipp";
 import { FlyerCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
@@ -532,6 +533,8 @@ export default function FlyerPage() {
   const [storeFilter, setStoreFilter] = useState("All");
   const [modal, setModal] = useState<ModalState | null>(null);
   const { toast } = useToast();
+  // Confirm dialog for dismiss
+  const [confirmDismiss, setConfirmDismiss] = useState<{ trackedItemId: number; flippId: number; itemName: string; trackedName: string } | null>(null);
   // Dismissed flyer items (per tracked item) — persists across sessions
   const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(() => {
     try {
@@ -724,7 +727,12 @@ export default function FlyerPage() {
               item={item}
               added={added.has(item.flippItem.id)}
               onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
-              onDismiss={item.trackedMatch ? () => handleDismiss(item.trackedMatch!.id, item.flippItem.id) : undefined}
+              onDismiss={item.trackedMatch ? () => setConfirmDismiss({
+                trackedItemId: item.trackedMatch!.id,
+                flippId: item.flippItem.id,
+                itemName: item.flippItem.name,
+                trackedName: item.trackedMatch!.name,
+              }) : undefined}
             />
           ))}
         </div>
@@ -736,6 +744,20 @@ export default function FlyerPage() {
           state={modal}
           onClose={() => setModal(null)}
           onAdded={handleAdded}
+        />
+      )}
+
+      {/* Confirm dismiss */}
+      {confirmDismiss && (
+        <ConfirmDialog
+          title="Dismiss Flyer Match?"
+          message={`This will remove "${confirmDismiss.itemName}" from matching "${confirmDismiss.trackedName}" in your flyer deals. The item will no longer appear in your tracked flyer deals comparison. You can re-add it next week when new flyers arrive.`}
+          confirmLabel="Dismiss Match"
+          onConfirm={() => {
+            handleDismiss(confirmDismiss.trackedItemId, confirmDismiss.flippId);
+            setConfirmDismiss(null);
+          }}
+          onCancel={() => setConfirmDismiss(null)}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -149,30 +150,13 @@ function DeleteConfirm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Delete Item?</h2>
-        <p className="text-sm text-gray-600">
-          <strong>{item.name}</strong> and all {item._count.priceEntries} price{" "}
-          {item._count.priceEntries === 1 ? "entry" : "entries"} will be permanently deleted.
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
-          >
-            {deleting ? "Deleting…" : "Delete"}
-          </button>
-        </div>
-      </div>
-    </div>
+    <ConfirmDialog
+      title={`Delete ${item.name}?`}
+      message={`This will permanently delete "${item.name}" and all ${item._count.priceEntries} price ${item._count.priceEntries === 1 ? "entry" : "entries"} you've logged for it. Your price history and averages for this item will be lost. Any flyer deals matching this item will no longer show comparisons.`}
+      confirmLabel={deleting ? "Deleting…" : "Delete Item"}
+      onConfirm={handleDelete}
+      onCancel={onClose}
+    />
   );
 }
 
