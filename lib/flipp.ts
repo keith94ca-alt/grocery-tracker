@@ -275,16 +275,16 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   );
   if (!allPresent) return false;
 
-  // Stage 2 — bidirectional Jaccard similarity
+  // Single-keyword items: word match in Stage 1 is specific enough.
+  // Skip Jaccard + coverage checks (compound flyer deals inflate keyword count)
+  if (trackedKw.size <= 1) return true;
+
+  // Stage 2 — bidirectional Jaccard similarity (multi-keyword items only)
   const intersect = fuzzyIntersect(trackedKw, flippKw);
   const union = trackedKw.size + flippKw.size - intersect;
   if (union === 0 || intersect / union < 0.35) return false;
 
   // Stage 3 — tracked keywords must cover at least 50% of flyer keywords
-  // Skip this check for single-keyword tracked items (e.g. "Tortilla") since
-  // compound flyer deals (e.g. "Bread Or Tortillas") inflate keyword count
-  if (trackedKw.size <= 1) return true;
-
   const coverage = intersect / flippKw.size;
   return coverage >= 0.5;
 }
