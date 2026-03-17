@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   const query = searchParams.get("q")?.trim();
 
   if (!query) {
-    return NextResponse.json([]);
+    return NextResponse.json({ error: "Search query 'q' is required" }, { status: 400 });
   }
 
   try {
@@ -26,26 +26,39 @@ export async function GET(request: NextRequest) {
       orderBy: { name: "asc" },
     });
 
-    // Compute stats inline for search results
-    const results = await Promise.all(
-      items.map(async (item) => {
-        const allPrices = await prisma.priceEntry.findMany({
-          where: { itemId: item.id },
-          select: { unitPrice: true },
-        });
-        const prices = allPrices.map((e) => e.unitPrice);
-        const stats =
-          prices.length > 0
-            ? {
-                avg: prices.reduce((a, b) => a + b, 0) / prices.length,
-                min: Math.min(...prices),
-                max: Math.max(...prices),
-                count: prices.length,
-              }
-            : null;
-        return { ...item, stats };
-      })
-    );
+    if (items.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Batch fetch all prices for matched items (avoids N+1 queries)
+    const itemIds = items.map((i) => i.id);
+    const allPrices = await prisma.priceEntry.findMany({
+      where: { itemId: { in: itemIds } },
+      select: { itemId: true, unitPrice: true },
+    });
+
+    // Group prices by itemId
+    const pricesByItem = new Map<number, number[]>();
+    for (const p of allPrices) {
+      const arr = pricesByItem.get(p.itemId) || [];
+      arr.push(p.unitPrice);
+      pricesByItem.set(p.itemId, arr);
+    }
+
+    // Compute stats
+    const results = items.map((item) => {
+      const prices = pricesByItem.get(item.id) || [];
+      const stats =
+        prices.length > 0
+          ? {
+              avg: prices.reduce((a, b) => a + b, 0) / prices.length,
+              min: Math.min(...prices),
+              max: Math.max(...prices),
+              count: prices.length,
+            }
+          : null;
+      return { ...item, stats };
+    });
 
     return NextResponse.json(results);
   } catch (error) {

@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
               ? {
                   avg: prices.reduce((a, b) => a + b, 0) / prices.length,
                   min: Math.min(...prices),
+                  max: Math.max(...prices),
                   latest: normalized[0]?.price ?? null,
                   latestStore: latest?.store ?? null,
                   latestDate: latest?.date ?? null,

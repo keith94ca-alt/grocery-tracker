@@ -44,6 +44,7 @@ export async function GET(
             latestDate: item.priceEntries[0]?.date ?? null,
             latestStore: item.priceEntries[0]?.store ?? null,
             canonicalUnit,
+            count: normalizedPrices.length,
           }
         : null;
 
