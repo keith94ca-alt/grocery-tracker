@@ -106,15 +106,34 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Enrich allDeals with flyer note overrides so the modal shows corrected unit prices
+      const enrichedDeals = matches.map((m) => {
+        const mNoteKey = `${item.id}:${m.id}:${m.merchantName}`;
+        const mNote = flyerNoteMap.get(mNoteKey);
+        if (mNote) {
+          return { ...m, unitPrice: mNote.unitPrice, unit: mNote.unit };
+        }
+        return m;
+      });
+
+      // Also enrich bestDeal with flyer note if available
+      const enrichedBest = (() => {
+        const mNote = flyerNoteMap.get(noteKey);
+        if (mNote) {
+          return { ...best, unitPrice: mNote.unitPrice, unit: mNote.unit };
+        }
+        return best;
+      })();
+
       results.push({
         itemId: item.id,
         itemName: item.name,
         latestUnitPrice: latestNorm?.price ?? null,
         latestUnit: latestNorm?.unit ?? null,
-        bestDeal: best,
+        bestDeal: enrichedBest,
         flyerUnitPrice: flyerNorm?.price ?? null,
         flyerUnit: flyerNorm?.unit ?? null,
-        allDeals: matches,
+        allDeals: enrichedDeals,
         savingsPercent,
         isCheaper,
         isOnFlyer: true,
