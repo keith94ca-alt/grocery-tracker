@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -11,18 +13,8 @@ const CATEGORIES = [
 
 const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
 
-// Pack size units the multi-pack helper understands
 const PACK_SIZE_UNITS = ["mL", "L", "g", "kg", "lb", "oz"];
 
-/**
- * Compute the canonical quantity from a multi-pack entry.
- *
- * e.g. packCount=2, sizeVal=877, sizeUnit="mL", targetUnit="per L"
- *      → 2 × 877mL = 1754mL = 1.754 L
- *
- * e.g. packCount=12, sizeVal=355, sizeUnit="mL", targetUnit="per 100mL"
- *      → 12 × 355mL = 4260mL = 42.6 × 100mL
- */
 function computeMultipackQty(
   packCount: string,
   sizeVal: string,
@@ -33,7 +25,6 @@ function computeMultipackQty(
   const s = parseFloat(sizeVal);
   if (!c || !s || c <= 0 || s <= 0) return null;
 
-  // Convert each pack item to a base amount (mL for volume, g for weight)
   type BaseResult = { amount: number; type: "vol" | "wt" };
   const toBase: Record<string, BaseResult> = {
     mL:  { amount: s,            type: "vol" },
@@ -47,12 +38,12 @@ function computeMultipackQty(
   const base = toBase[sizeUnit];
   if (!base) return null;
 
-  const totalBase = c * base.amount; // total in mL or g
+  const totalBase = c * base.amount;
 
   if (base.type === "vol") {
     if (targetUnit === "per L")     return totalBase / 1000;
     if (targetUnit === "per 100mL") return totalBase / 100;
-    return null; // incompatible unit selected
+    return null;
   }
 
   if (base.type === "wt") {
@@ -65,19 +56,16 @@ function computeMultipackQty(
   return null;
 }
 
-/** Human-readable total for the pack summary label */
 function packTotalLabel(packCount: string, sizeVal: string, sizeUnit: string): string {
   const c = parseFloat(packCount);
   const s = parseFloat(sizeVal);
   if (!c || !s) return "";
   const total = c * s;
-  // Pick the friendlier display unit
   if (sizeUnit === "mL" && total >= 1000) return `${(total / 1000).toFixed(3).replace(/\.?0+$/, "")} L`;
   if (sizeUnit === "g"  && total >= 1000) return `${(total / 1000).toFixed(3).replace(/\.?0+$/, "")} kg`;
   return `${total} ${sizeUnit}`;
 }
 
-/** Auto-suggest a canonical unit based on the pack size unit chosen */
 function suggestUnit(packSizeUnit: string): string {
   if (["mL", "L"].includes(packSizeUnit)) return "per L";
   if (["g", "kg", "lb", "oz"].includes(packSizeUnit)) return "per kg";
@@ -87,6 +75,7 @@ function suggestUnit(packSizeUnit: string): string {
 function AddForm() {
   const searchParams = useSearchParams();
   const itemInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const [form, setForm] = useState({
     itemName: searchParams.get("item") || "",
@@ -99,7 +88,6 @@ function AddForm() {
     notes: "",
   });
 
-  // Multi-pack calculator state
   const [packMode, setPackMode] = useState(false);
   const [packCount, setPackCount] = useState("1");
   const [packSizeVal, setPackSizeVal] = useState("");
@@ -110,8 +98,16 @@ function AddForm() {
   const [showItemDropdown, setShowItemDropdown] = useState(false);
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
+
+  // Load recent items from localStorage
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("grocery-recent-items");
+      if (raw) setRecentItems(JSON.parse(raw));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if (!form.itemName) itemInputRef.current?.focus();
@@ -144,13 +140,11 @@ function AddForm() {
     return () => clearTimeout(timer);
   }, [form.store]);
 
-  // When pack size unit changes, suggest the canonical tracking unit
   useEffect(() => {
     if (!packMode) return;
     setForm((prev) => ({ ...prev, unit: suggestUnit(packSizeUnit) }));
   }, [packSizeUnit, packMode]);
 
-  // Auto-compute quantity whenever any pack field or unit changes
   useEffect(() => {
     if (!packMode) return;
     const qty = computeMultipackQty(packCount, packSizeVal, packSizeUnit, form.unit);
@@ -167,11 +161,18 @@ function AddForm() {
   const quantity = parseFloat(form.quantity);
   const unitPrice = price > 0 && quantity > 0 ? price / quantity : null;
 
-  // Check if the current pack size unit is compatible with the selected tracking unit
   const packQtyComputed = packMode
     ? computeMultipackQty(packCount, packSizeVal, packSizeUnit, form.unit)
     : null;
   const packIncompatible = packMode && packSizeVal !== "" && packQtyComputed === null;
+
+  function saveRecentItem(name: string, category: string, unit: string) {
+    try {
+      const updated = [{ name, category, unit }, ...recentItems.filter((i) => i.name !== name)].slice(0, 10);
+      setRecentItems(updated);
+      localStorage.setItem("grocery-recent-items", JSON.stringify(updated));
+    } catch {}
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -186,29 +187,29 @@ function AddForm() {
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "Failed to save");
+        toast(data.error || "Failed to save", "error");
         return;
       }
-      setSuccess(true);
-      setTimeout(() => {
-        setForm((prev) => ({
-          itemName: "",
-          category: "Other",
-          unit: "each",
-          price: "",
-          quantity: "1",
-          store: prev.store,
-          date: new Date().toISOString().split("T")[0],
-          notes: "",
-        }));
-        setPackMode(false);
-        setPackCount("1");
-        setPackSizeVal("");
-        setPackSizeUnit("mL");
-        setSuccess(false);
-        itemInputRef.current?.focus();
-      }, 2500);
+      saveRecentItem(form.itemName, form.category, form.unit);
+      toast(`Saved ${form.itemName} at $${parseFloat(form.price).toFixed(2)}`);
+      setForm((prev) => ({
+        itemName: "",
+        category: "Other",
+        unit: "each",
+        price: "",
+        quantity: "1",
+        store: prev.store,
+        date: new Date().toISOString().split("T")[0],
+        notes: "",
+      }));
+      setPackMode(false);
+      setPackCount("1");
+      setPackSizeVal("");
+      setPackSizeUnit("mL");
+      itemInputRef.current?.focus();
     } catch {
       setError("Network error — please try again");
+      toast("Network error", "error");
     } finally {
       setSubmitting(false);
     }
@@ -226,16 +227,35 @@ function AddForm() {
 
   return (
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
-      <h2 className="text-xl font-bold text-gray-900">Add Price Entry</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900">Add Price Entry</h2>
+        {recentItems.length > 0 && (
+          <span className="text-xs text-gray-400">{recentItems.length} recent items</span>
+        )}
+      </div>
 
-      {success && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl text-sm font-medium flex items-center gap-2 animate-bounce">
-          ✅ Saved!
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm animate-shake">
+          ⚠️ {error}
         </div>
       )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
-          ⚠️ {error}
+
+      {/* Recent items quick-pick — only show when field is empty */}
+      {!form.itemName && recentItems.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Recent items</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4">
+            {recentItems.slice(0, 8).map((item, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => selectItem(item)}
+                className="shrink-0 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-brand-300 hover:bg-brand-50 transition-colors active:scale-95"
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -251,14 +271,14 @@ function AddForm() {
           onBlur={() => setTimeout(() => setShowItemDropdown(false), 150)}
           placeholder="e.g., Dove Body Wash"
           required
-          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500 transition-shadow"
         />
         {showItemDropdown && itemSuggestions.length > 0 && (
           <ul className="absolute z-50 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 overflow-hidden">
             {itemSuggestions.map((item) => (
               <li key={item.id}>
                 <button type="button" onMouseDown={() => selectItem(item)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100">
+                  className="w-full text-left px-4 py-3 hover:bg-brand-50 text-sm border-b last:border-0 border-gray-100 active:bg-brand-100">
                   <span className="font-medium">{item.name}</span>
                   <span className="text-gray-500 ml-2">{item.category} · {item.unit}</span>
                 </button>
@@ -302,20 +322,19 @@ function AddForm() {
           onClick={() => {
             setPackMode((v) => !v);
             if (packMode) {
-              // Reset to manual qty when turning off
               setForm((prev) => ({ ...prev, quantity: "1" }));
             }
           }}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-colors ${
+          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
             packMode
-              ? "bg-blue-600 text-white border-blue-600"
-              : "bg-white text-gray-600 border-gray-300"
+              ? "bg-brand-600 text-white border-brand-600 shadow-sm"
+              : "bg-white text-gray-600 border-gray-300 hover:border-brand-300"
           }`}
         >
           📦 {packMode ? "Multi-pack ON" : "Multi-pack / Bundle"}
         </button>
-        <p className="text-xs text-gray-400 mt-1">
-          Use this for bundles like &ldquo;2×877mL&rdquo; or &ldquo;12-pack 355mL cans&rdquo;
+        <p className="text-xs text-gray-400 mt-1.5">
+          For bundles like &ldquo;2×877mL&rdquo; or &ldquo;12-pack 355mL cans&rdquo;
         </p>
       </div>
 
@@ -324,9 +343,8 @@ function AddForm() {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
           <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Pack details</p>
 
-          <div className="flex items-center gap-2">
-            {/* Pack count */}
-            <div className="flex-none w-16">
+          <div className="flex items-end gap-2">
+            <div className="flex-none w-20">
               <label className="block text-xs text-gray-500 mb-1">Count</label>
               <input
                 type="number"
@@ -336,16 +354,15 @@ function AddForm() {
                 min="1"
                 step="1"
                 inputMode="numeric"
-                className="w-full px-2 py-2 border border-gray-300 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-2 py-2.5 border border-gray-300 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
 
-            <span className="text-gray-400 text-lg mt-4">×</span>
+            <span className="text-gray-400 text-lg pb-2">×</span>
 
-            {/* Item size */}
             <div className="flex-1">
               <label className="block text-xs text-gray-500 mb-1">Each item is</label>
-              <div className="flex gap-1">
+              <div className="flex gap-1.5">
                 <input
                   type="number"
                   value={packSizeVal}
@@ -354,12 +371,12 @@ function AddForm() {
                   min="0"
                   step="any"
                   inputMode="decimal"
-                  className="flex-1 px-2 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="flex-1 px-2 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
                 <select
                   value={packSizeUnit}
                   onChange={(e) => setPackSizeUnit(e.target.value)}
-                  className="px-2 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="px-2 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   {PACK_SIZE_UNITS.map((u) => <option key={u}>{u}</option>)}
                 </select>
@@ -367,7 +384,6 @@ function AddForm() {
             </div>
           </div>
 
-          {/* Summary / validation */}
           {packSizeVal && parseFloat(packSizeVal) > 0 && (
             <div className="text-sm">
               {packIncompatible ? (
@@ -392,7 +408,6 @@ function AddForm() {
         </div>
       )}
 
-      {/* Manual quantity — hidden when pack mode is computing it */}
       {!packMode && (
         <div className="space-y-1.5">
           <label className="block text-sm font-medium text-gray-700">
@@ -410,15 +425,10 @@ function AddForm() {
 
       {/* Unit price preview */}
       {unitPrice !== null && (
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm">
-          <span className="text-green-700">Unit price: </span>
-          <strong className="text-green-800 text-base">${unitPrice.toFixed(2)}</strong>
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+          <span className="text-green-600">=</span>
+          <strong className="text-green-800 text-lg">${unitPrice.toFixed(2)}</strong>
           <span className="text-green-600">/{form.unit.replace("per ", "")}</span>
-          {packMode && packSizeVal && (
-            <span className="text-green-500 ml-2 text-xs">
-              (from {packCount}×{packSizeVal}{packSizeUnit} at ${form.price})
-            </span>
-          )}
         </div>
       )}
 
@@ -436,7 +446,7 @@ function AddForm() {
             {storeSuggestions.map((store) => (
               <li key={store.id}>
                 <button type="button" onMouseDown={() => selectStore(store)}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 text-sm border-b last:border-0 border-gray-100 font-medium">
+                  className="w-full text-left px-4 py-3 hover:bg-brand-50 text-sm border-b last:border-0 border-gray-100 font-medium active:bg-brand-100">
                   {store.name}
                 </button>
               </li>
@@ -460,14 +470,18 @@ function AddForm() {
         </label>
         <input type="text" value={form.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-          placeholder="e.g., Costco 2-pack special, AAA grade"
+          placeholder="e.g., organic, on sale"
           className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
       </div>
 
       <button type="submit" disabled={submitting || packIncompatible}
-        className="w-full py-4 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        className="w-full py-4 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-semibold rounded-xl text-base shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98]">
         {submitting ? "Saving…" : "Save Price Entry"}
       </button>
+
+      <p className="text-center text-xs text-gray-400">
+        Tip: <Link href="/flyer" className="text-brand-600 font-medium">Browse flyers</Link> to find deals and log prices directly
+      </p>
     </form>
   );
 }

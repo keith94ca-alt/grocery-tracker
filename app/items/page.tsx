@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
+import { useToast } from "@/components/Toast";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -36,6 +37,7 @@ function EditModal({
   const [unit, setUnit] = useState(item.unit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   async function handleSave() {
     if (!name.trim()) { setError("Name is required"); return; }
@@ -50,6 +52,7 @@ function EditModal({
       if (res.status === 409) { setError("An item with that name already exists"); return; }
       if (!res.ok) { setError("Failed to save — try again"); return; }
       const updated = await res.json();
+      toast(`Updated ${name.trim()}`, "success");
       onSaved({ ...updated, _count: item._count });
     } finally {
       setSaving(false);
@@ -130,12 +133,16 @@ function DeleteConfirm({
   onDeleted: (id: number) => void;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
 
   async function handleDelete() {
     setDeleting(true);
     try {
       const res = await fetch(`/api/items/${item.id}`, { method: "DELETE" });
-      if (res.ok) onDeleted(item.id);
+      if (res.ok) {
+        toast(`Deleted ${item.name}`, "info");
+        onDeleted(item.id);
+      }
     } finally {
       setDeleting(false);
     }
@@ -185,6 +192,7 @@ function WatchModal({
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast } = useToast();
 
   // Autocomplete: search existing items as user types
   function handleNameChange(val: string) {
@@ -214,6 +222,7 @@ function WatchModal({
       });
       if (!res.ok) { setError("Failed to save — try again"); return; }
       const created = await res.json();
+      toast(`Now watching ${name.trim()}`, "success");
       onAdded({ ...created, _count: { priceEntries: 0 } });
     } finally {
       setSaving(false);
@@ -324,6 +333,7 @@ export default function ItemsPage() {
   const [deleteItem, setDeleteItem] = useState<ManagedItem | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showWatchModal, setShowWatchModal] = useState(false);
+  const { toast } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -352,6 +362,7 @@ export default function ItemsPage() {
         setItems((prev) =>
           prev.map((i) => (i.id === item.id ? { ...i, watched: !i.watched } : i))
         );
+        toast(item.watched ? `Removed ${item.name} from watchlist` : `Now watching ${item.name}`, "success");
       }
     } finally {
       setTogglingId(null);

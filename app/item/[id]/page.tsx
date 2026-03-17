@@ -7,6 +7,7 @@ import { convertUnitPrice, sameUnitGroup } from "@/lib/units";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
 import PriceChart from "@/components/PriceChart";
+import { useToast } from "@/components/Toast";
 
 interface PriceEntry {
   id: number;
@@ -284,6 +285,7 @@ function formatDate(dateStr: string) {
 export default function ItemPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const [item, setItem] = useState<ItemDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -291,6 +293,7 @@ export default function ItemPage() {
   const [deal, setDeal] = useState<DealResult | null>(null);
   const [allDeals, setAllDeals] = useState<FlippItem[]>([]);
   const [showDealsModal, setShowDealsModal] = useState(false);
+  const [undoStack, setUndoStack] = useState<{ entry: PriceEntry; index: number }[]>([]);
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -319,12 +322,15 @@ export default function ItemPage() {
 
   async function deleteEntry(entryId: number) {
     setDeletingId(entryId);
+    // Save for undo
+    const entry = item?.priceEntries.find((e) => e.id === entryId);
     try {
       const res = await fetch(`/api/prices/${entryId}`, { method: "DELETE" });
-      if (res.ok) {
+      if (res.ok && entry) {
         setItem((prev) =>
           prev ? { ...prev, priceEntries: prev.priceEntries.filter((e) => e.id !== entryId) } : prev
         );
+        toast("Entry deleted", "info", 5000);
       }
     } finally {
       setDeletingId(null);
