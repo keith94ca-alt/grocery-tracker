@@ -64,20 +64,11 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
   return (
     <div
-      className={`${bg} px-5 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-2 pointer-events-auto animate-toast-in`}
+      className={`${bg} px-5 py-3 rounded-2xl shadow-2xl text-sm font-medium flex items-center gap-2 pointer-events-auto animate-slide-up`}
       onClick={onDismiss}
     >
       <span>{icon}</span>
       <span>{toast.message}</span>
-      <style jsx>{`
-        @keyframes toast-in {
-          0% { opacity: 0; transform: translateY(16px) scale(0.95); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .animate-toast-in {
-          animation: toast-in 0.25s ease-out;
-        }
-      `}</style>
     </div>
   );
 }

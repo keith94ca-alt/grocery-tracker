@@ -50,6 +50,10 @@ export default function StoresPage() {
         existing.totalEntries++;
         existing.avgUnitPrice = (existing.avgUnitPrice * (existing.totalEntries - 1) + e.unitPrice) / existing.totalEntries;
         existing.categories.add(e.item.category);
+        // Track unique items
+        if (!existing.bestDeals.some((d) => d.name === e.item.name)) {
+          existing.itemCount++;
+        }
         // Track this item if it's cheaper than existing best deals for this store
         const existingBest = existing.bestDeals.find((d) => d.name === e.item.name);
         if (!existingBest || e.unitPrice < existingBest.unitPrice) {
