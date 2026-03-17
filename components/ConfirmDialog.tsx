@@ -18,14 +18,16 @@ export default function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
       <div
-        className="bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-4 animate-slide-up"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-        <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
-        <div className="flex gap-2">
+        <div className="p-5 pb-3 overflow-y-auto">
+          <h3 className="text-lg font-bold text-gray-900 mb-3">{title}</h3>
+          <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
+        </div>
+        <div className="flex gap-2 px-5 pb-5 pt-2 border-t border-gray-100">
           <button
             onClick={onCancel}
             className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50"
