@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import type { DealResult } from "@/app/api/flyer-deals/route";
 
 interface ShoppingItem {
   id: string;
@@ -12,6 +13,15 @@ interface ShoppingItem {
   addedAt: number;
   priceLogged: boolean;
   price?: number;
+  priceExpanded?: boolean;
+}
+
+interface InlinePriceForm {
+  price: string;
+  quantity: string;
+  unit: string;
+  store: string;
+  saving: boolean;
 }
 
 const CATEGORIES = [
@@ -38,195 +48,6 @@ function saveList(items: ShoppingItem[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-// Price logging modal
-function PriceModal({
-  item,
-  onClose,
-  onSaved,
-}: {
-  item: ShoppingItem;
-  onClose: () => void;
-  onSaved: (price: number) => void;
-}) {
-  const [price, setPrice] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [unit, setUnit] = useState("each");
-  const [store, setStore] = useState("");
-  const [storeSuggestions, setStoreSuggestions] = useState<{ id: number; name: string }[]>([]);
-  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const priceInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    priceInputRef.current?.focus();
-  }, []);
-
-  // Store autocomplete
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      try {
-        const q = store ? `?q=${encodeURIComponent(store)}` : "";
-        const res = await fetch(`/api/stores${q}`);
-        const data = await res.json();
-        if (Array.isArray(data)) setStoreSuggestions(data.slice(0, 5));
-      } catch {}
-    }, 200);
-    return () => clearTimeout(timer);
-  }, [store]);
-
-  async function handleSave() {
-    const p = parseFloat(price);
-    if (!p || p <= 0) { setError("Enter a valid price"); return; }
-    if (!store.trim()) { setError("Store is required"); return; }
-
-    setSaving(true);
-    setError("");
-    try {
-      const res = await fetch("/api/prices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemName: item.name,
-          category: item.category,
-          unit,
-          price: p,
-          quantity: parseFloat(quantity) || 1,
-          store: store.trim(),
-          date: new Date().toISOString(),
-          source: "manual",
-          notes: "Logged from shopping list",
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || "Failed to save");
-        return;
-      }
-      toast(`Logged ${item.name} at $${p.toFixed(2)}`, "success");
-      onSaved(p);
-    } catch {
-      setError("Network error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const unitPrice = price && parseFloat(price) > 0 && parseFloat(quantity) > 0
-    ? parseFloat(price) / parseFloat(quantity)
-    : null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="bg-white rounded-t-2xl lg:rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-4 animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold text-gray-900">💰 Log price for {item.name}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-        </div>
-
-        {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-
-        {/* Price + quantity */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Price paid ($) *</label>
-            <input
-              ref={priceInputRef}
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              step="0.01"
-              min="0.01"
-              inputMode="decimal"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              step="0.01"
-              min="0.01"
-              inputMode="decimal"
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-        </div>
-
-        {/* Unit */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-          <select
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            {UNITS.map((u) => <option key={u}>{u}</option>)}
-          </select>
-        </div>
-
-        {/* Store */}
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Store *</label>
-          <input
-            type="text"
-            value={store}
-            onChange={(e) => { setStore(e.target.value); setShowStoreDropdown(true); }}
-            onFocus={() => setShowStoreDropdown(true)}
-            onBlur={() => setTimeout(() => setShowStoreDropdown(false), 150)}
-            placeholder="e.g., Costco"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          {showStoreDropdown && storeSuggestions.length > 0 && (
-            <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-              {storeSuggestions.map((s) => (
-                <li key={s.id}>
-                  <button
-                    type="button"
-                    onMouseDown={() => { setStore(s.name); setShowStoreDropdown(false); }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                  >
-                    {s.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Unit price preview */}
-        {unitPrice && (
-          <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-sm">
-            <span className="text-green-700">Unit price: </span>
-            <strong className="text-green-800">${unitPrice.toFixed(2)}</strong>
-            <span className="text-green-600">/{unit.replace("per ", "")}</span>
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-600">
-            Skip (no price)
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "💾 Save Price"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ShoppingListPage() {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newName, setNewName] = useState("");
@@ -235,13 +56,29 @@ export default function ShoppingListPage() {
   const [filter, setFilter] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<{ id: number; name: string; category: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [priceModalItem, setPriceModalItem] = useState<ShoppingItem | null>(null);
+  const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
+  const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
   useEffect(() => { setItems(loadList()); }, []);
   useEffect(() => { saveList(items); }, [items]);
+
+  // Load flyer deals on mount
+  useEffect(() => {
+    fetch("/api/flyer-deals")
+      .then((r) => r.json())
+      .then((data: DealResult[]) => {
+        if (!Array.isArray(data)) return;
+        const map = new Map<string, DealResult>();
+        data.forEach((d) => {
+          if (d.isCheaper) map.set(d.itemName.toLowerCase(), d);
+        });
+        setFlyerDeals(map);
+      })
+      .catch(() => {});
+  }, []);
 
   function handleNameChange(val: string) {
     setNewName(val);
@@ -282,42 +119,120 @@ export default function ShoppingListPage() {
     if (!item) return;
 
     if (!item.checked) {
-      // Checking the item — show price modal
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: true } : i)));
-      setPriceModalItem(item);
+      // Checking: expand price form
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: true, priceExpanded: true } : i)));
+      setPriceForms((prev) => {
+        const next = new Map(prev);
+        next.set(id, { price: "", quantity: "1", unit: "each", store: "", saving: false });
+        return next;
+      });
     } else {
-      // Unchecking
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: false, priceLogged: false } : i)));
+      // Unchecking: collapse and clear form
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: false, priceLogged: false, priceExpanded: false } : i)));
+      setPriceForms((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
     }
   }
 
-  function handlePriceSaved(price: number) {
-    if (!priceModalItem) return;
+  function togglePriceForm(id: string) {
     setItems((prev) =>
-      prev.map((i) =>
-        i.id === priceModalItem.id ? { ...i, priceLogged: true, price } : i
-      )
+      prev.map((i) => (i.id === id ? { ...i, priceExpanded: !i.priceExpanded } : i))
     );
-    setPriceModalItem(null);
   }
 
-  function handlePriceSkip() {
-    setPriceModalItem(null);
+  function updatePriceForm(id: string, field: keyof InlinePriceForm, value: string) {
+    setPriceForms((prev) => {
+      const next = new Map(prev);
+      const form = next.get(id);
+      if (form) next.set(id, { ...form, [field]: value });
+      return next;
+    });
+  }
+
+  async function logPrice(id: string) {
+    const item = items.find((i) => i.id === id);
+    const form = priceForms.get(id);
+    if (!item || !form) return;
+
+    const p = parseFloat(form.price);
+    if (!p || p <= 0) { toast("Enter a valid price", "error"); return; }
+    if (!form.store.trim()) { toast("Store is required", "error"); return; }
+
+    setPriceForms((prev) => {
+      const next = new Map(prev);
+      const f = next.get(id);
+      if (f) next.set(id, { ...f, saving: true });
+      return next;
+    });
+
+    try {
+      const res = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemName: item.name,
+          category: item.category,
+          unit: form.unit,
+          price: p,
+          quantity: parseFloat(form.quantity) || 1,
+          store: form.store.trim(),
+          date: new Date().toISOString(),
+          source: "manual",
+          notes: "Logged from shopping list",
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast(data.error || "Failed to save", "error");
+        return;
+      }
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, priceLogged: true, price: p, priceExpanded: false } : i))
+      );
+      toast(`Logged ${item.name} at $${p.toFixed(2)}`, "success");
+    } catch {
+      toast("Network error", "error");
+    } finally {
+      setPriceForms((prev) => {
+        const next = new Map(prev);
+        const f = next.get(id);
+        if (f) next.set(id, { ...f, saving: false });
+        return next;
+      });
+    }
   }
 
   function removeItem(id: string) {
     setItems((prev) => prev.filter((i) => i.id !== id));
+    setPriceForms((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
-  // Clear completed: only remove items without prices logged
   function clearChecked() {
     const removed = items.filter((i) => i.checked && !i.priceLogged).length;
     setItems((prev) => prev.filter((i) => !i.checked || i.priceLogged));
     if (removed > 0) toast(`Cleared ${removed} untracked items`, "info");
   }
 
-  function clearAll() {
-    setItems([]);
+  function clearAll() { setItems([]); }
+
+  // Find best flyer deal for an item (fuzzy match by name)
+  function findFlyerDeal(itemName: string): DealResult | undefined {
+    const lower = itemName.toLowerCase();
+    // Exact match first
+    const exact = flyerDeals.get(lower);
+    if (exact) return exact;
+    // Partial match: check if any deal's item name contains our item name or vice versa
+    for (const [key, deal] of flyerDeals) {
+      if (lower.includes(key) || key.includes(lower)) return deal;
+    }
+    return undefined;
   }
 
   const sorted = [...items].sort((a, b) => {
@@ -354,11 +269,8 @@ export default function ShoppingListPage() {
             <>
               <span className="text-sm text-gray-500">{uncheckedCount} to buy</span>
               {checkedCount > 0 && (
-                <button
-                  onClick={clearChecked}
-                  className="text-xs text-red-500 font-medium hover:text-red-700 px-2 py-1 rounded hover:bg-red-50"
-                  title="Remove unchecked-price items from list"
-                >
+                <button onClick={clearChecked}
+                  className="text-xs text-red-500 font-medium hover:text-red-700 px-2 py-1 rounded hover:bg-red-50">
                   Clear ✓ ({checkedCount}{loggedCount > 0 ? ` · ${loggedCount} logged` : ""})
                 </button>
               )}
@@ -396,20 +308,15 @@ export default function ShoppingListPage() {
               </ul>
             )}
           </div>
-          <button
-            onClick={() => addItem(newName)}
-            disabled={!newName.trim()}
-            className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-semibold disabled:opacity-40"
-          >
+          <button onClick={() => addItem(newName)} disabled={!newName.trim()}
+            className="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-semibold disabled:opacity-40">
             Add
           </button>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <span className="text-xs text-gray-400">Category:</span>
-          <button
-            onClick={() => setShowCategoryPicker(!showCategoryPicker)}
-            className="text-xs font-medium text-brand-600 hover:text-brand-700"
-          >
+          <button onClick={() => setShowCategoryPicker(!showCategoryPicker)}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700">
             {newCategory} ▾
           </button>
         </div>
@@ -466,75 +373,133 @@ export default function ShoppingListPage() {
         <div className="space-y-4">
           {Array.from(grouped.entries()).map(([category, catItems]) => (
             <div key={category} className="space-y-1">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">
-                {category}
-              </h3>
-              {catItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`bg-white rounded-xl border px-4 py-3 flex items-center gap-3 transition-all ${
-                    item.checked
-                      ? item.priceLogged
-                        ? "border-green-200 bg-green-50/30"
-                        : "border-gray-100 opacity-60"
-                      : "border-gray-200 shadow-sm"
-                  }`}
-                >
-                  {/* Checkbox */}
-                  <button
-                    onClick={() => toggleItem(item.id)}
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all active:scale-90 ${
-                      item.checked
-                        ? "bg-brand-600 border-brand-600 text-white"
-                        : "border-gray-300 hover:border-brand-400"
-                    }`}
-                  >
-                    {item.checked && <span className="text-sm">✓</span>}
-                  </button>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">{category}</h3>
+              {catItems.map((item) => {
+                const deal = !item.checked ? findFlyerDeal(item.name) : undefined;
+                const form = priceForms.get(item.id);
+                const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
+                  ? (parseFloat(form.price) / parseFloat(form.quantity || "1")).toFixed(2)
+                  : null;
 
-                  {/* Name + status */}
-                  <div className="flex-1 min-w-0">
-                    <span
-                      className={`text-sm block ${
-                        item.checked && !item.priceLogged ? "line-through text-gray-400" : "font-medium text-gray-900"
+                return (
+                  <div key={item.id}>
+                    {/* Main item row */}
+                    <div
+                      className={`bg-white rounded-xl border px-4 py-3 flex items-center gap-3 transition-all ${
+                        item.checked
+                          ? item.priceLogged ? "border-green-200 bg-green-50/30" : "border-gray-100 opacity-70"
+                          : "border-gray-200 shadow-sm"
                       }`}
                     >
-                      {item.name}
-                    </span>
-                    {item.priceLogged && (
-                      <span className="text-xs text-green-600 font-medium">
-                        💰 ${item.price?.toFixed(2)} tracked
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    {/* Log price button for checked items without price */}
-                    {item.checked && !item.priceLogged && (
+                      {/* Checkbox */}
                       <button
-                        onClick={() => setPriceModalItem(item)}
-                        className="px-2 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
-                        title="Log price"
+                        onClick={() => toggleItem(item.id)}
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all active:scale-90 ${
+                          item.checked ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 hover:border-brand-400"
+                        }`}
                       >
-                        💰
+                        {item.checked && <span className="text-sm">✓</span>}
                       </button>
+
+                      {/* Name + status */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm ${item.checked && !item.priceLogged ? "line-through text-gray-400" : "font-medium text-gray-900"}`}>
+                            {item.name}
+                          </span>
+                          {item.priceLogged && (
+                            <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
+                          )}
+                        </div>
+                        {/* Flyer deal line */}
+                        {deal && !item.checked && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-green-700 font-medium">
+                              🏷️ ${deal.bestDeal.currentPrice.toFixed(2)} at {deal.bestDeal.merchantName}
+                            </span>
+                            {deal.savingsPercent && (
+                              <span className="text-xs text-green-600">↓{deal.savingsPercent}%</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Expand/collapse price form */}
+                        {item.checked && !item.priceLogged && (
+                          <button
+                            onClick={() => togglePriceForm(item.id)}
+                            className="px-2 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+                          >
+                            {item.priceExpanded ? "✕" : "💰"}
+                          </button>
+                        )}
+                        {item.priceLogged && <span className="text-xs text-green-600">✅</span>}
+                        <button onClick={() => removeItem(item.id)}
+                          className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
+                          title="Remove">
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inline price form (expanded) */}
+                    {item.checked && item.priceExpanded && !item.priceLogged && form && (
+                      <div className="bg-white border border-brand-200 border-t-0 rounded-b-xl px-4 pb-3 pt-2 -mt-1 space-y-2 animate-fade-in">
+                        <p className="text-xs font-medium text-gray-500">Log what you paid (optional)</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-0.5">Price ($)</label>
+                            <input type="number" value={form.price}
+                              onChange={(e) => updatePriceForm(item.id, "price", e.target.value)}
+                              placeholder="0.00" step="0.01" min="0" inputMode="decimal"
+                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-0.5">Qty</label>
+                            <input type="number" value={form.quantity}
+                              onChange={(e) => updatePriceForm(item.id, "quantity", e.target.value)}
+                              step="0.01" min="0.01" inputMode="decimal"
+                              className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-0.5">Unit</label>
+                            <select value={form.unit}
+                              onChange={(e) => updatePriceForm(item.id, "unit", e.target.value)}
+                              className="w-full px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
+                              {UNITS.map((u) => <option key={u}>{u}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-0.5">Store</label>
+                          <input type="text" value={form.store}
+                            onChange={(e) => updatePriceForm(item.id, "store", e.target.value)}
+                            placeholder="e.g., Costco"
+                            className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                        </div>
+                        {/* Unit price preview */}
+                        {unitPrice && (
+                          <p className="text-xs text-green-700">
+                            Unit price: <strong>${unitPrice}/{form.unit.replace("per ", "")}</strong>
+                          </p>
+                        )}
+                        <div className="flex gap-2">
+                          <button onClick={() => togglePriceForm(item.id)}
+                            className="flex-1 py-2 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            Skip
+                          </button>
+                          <button onClick={() => logPrice(item.id)} disabled={form.saving}
+                            className="flex-1 py-2 text-xs font-semibold text-white bg-brand-600 rounded-lg disabled:opacity-50">
+                            {form.saving ? "Saving…" : "💾 Save Price"}
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    {/* View tracked item */}
-                    {item.priceLogged && (
-                      <span className="text-xs text-green-600">✅</span>
-                    )}
-                    {/* Remove */}
-                    <button
-                      onClick={() => removeItem(item.id)}
-                      className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
-                      title="Remove"
-                    >
-                      ×
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ))}
         </div>
@@ -547,15 +512,6 @@ export default function ShoppingListPage() {
             Clear entire list
           </button>
         </div>
-      )}
-
-      {/* Price modal */}
-      {priceModalItem && (
-        <PriceModal
-          item={priceModalItem}
-          onClose={handlePriceSkip}
-          onSaved={handlePriceSaved}
-        />
       )}
     </div>
   );
