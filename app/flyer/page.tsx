@@ -414,10 +414,12 @@ function FlyerCard({
   item,
   added,
   onAction,
+  onDismiss,
 }: {
   item: FlyerBrowseItem;
   added: boolean;
   onAction: () => void;
+  onDismiss?: () => void;
 }) {
   const { flippItem, trackedMatch } = item;
   const unitLabel = flippItem.unit?.replace("per ", "");
@@ -447,9 +449,20 @@ function FlyerCard({
           <p className="text-xs text-orange-600 font-medium mt-0.5">{flippItem.saleStory}</p>
         )}
         {trackedMatch && !added && (
-          <p className="text-xs text-brand-600 mt-1">
-            → tracked as <strong>{trackedMatch.name}</strong>
-          </p>
+          <div className="flex items-center gap-1 mt-1">
+            <p className="text-xs text-brand-600">
+              → tracked as <strong>{trackedMatch.name}</strong>
+            </p>
+            {onDismiss && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+                className="text-xs text-gray-400 hover:text-red-500 ml-1 transition-colors"
+                title="Dismiss this match"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -519,6 +532,18 @@ export default function FlyerPage() {
   const [storeFilter, setStoreFilter] = useState("All");
   const [modal, setModal] = useState<ModalState | null>(null);
   const { toast } = useToast();
+  // Dismissed flyer items (per tracked item) — persists across sessions
+  const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(() => {
+    try {
+      const raw = localStorage.getItem("flyer-dismissed");
+      if (!raw) return new Map();
+      const parsed = JSON.parse(raw) as Record<string, number[]>;
+      return new Map(Object.entries(parsed).map(([k, v]) => [k, new Set(v)]));
+    } catch {
+      return new Map();
+    }
+  });
+
   const [added, setAdded] = useState<Set<number>>(() => {
     try {
       const raw = sessionStorage.getItem("flyer-added");
@@ -547,6 +572,12 @@ export default function FlyerPage() {
   const displayed = (tab === "new" ? newItems : trackedItems).filter((i) => {
     // Hide if already added this session
     if (added.has(i.flippItem.id)) return false;
+    // Hide if dismissed for this tracked item
+    if (i.trackedMatch) {
+      const key = `${i.trackedMatch.id}`;
+      const dismissedSet = dismissed.get(key);
+      if (dismissedSet && dismissedSet.has(i.flippItem.id)) return false;
+    }
     const matchesStore = storeFilter === "All" || i.flippItem.merchantName === storeFilter;
     const matchesFilter =
       !filter ||
@@ -554,6 +585,24 @@ export default function FlyerPage() {
       i.trackedMatch?.name.toLowerCase().includes(filter.toLowerCase());
     return matchesStore && matchesFilter;
   });
+
+  function handleDismiss(trackedItemId: number, flippId: number) {
+    setDismissed((prev) => {
+      const key = `${trackedItemId}`;
+      const next = new Map(prev);
+      const set = new Set(next.get(key) || []);
+      set.add(flippId);
+      next.set(key, set);
+      // Persist to localStorage
+      try {
+        const obj: Record<string, number[]> = {};
+        next.forEach((v, k) => { obj[k] = [...v]; });
+        localStorage.setItem("flyer-dismissed", JSON.stringify(obj));
+      } catch {}
+      return next;
+    });
+    toast("Match dismissed for this flyer", "info");
+  }
 
   function handleAdded(flippId: number, itemName: string) {
     toast(`Added ${itemName}`, "success");
@@ -675,6 +724,7 @@ export default function FlyerPage() {
               item={item}
               added={added.has(item.flippItem.id)}
               onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
+              onDismiss={item.trackedMatch ? () => handleDismiss(item.trackedMatch!.id, item.flippItem.id) : undefined}
             />
           ))}
         </div>
