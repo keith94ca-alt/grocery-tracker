@@ -458,6 +458,26 @@ function AddForm() {
       {/* Date */}
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-gray-700">Date</label>
+        <div className="flex gap-2 mb-2">
+          {[
+            { label: "Today", date: new Date().toISOString().split("T")[0] },
+            { label: "Yesterday", date: new Date(Date.now() - 86400000).toISOString().split("T")[0] },
+            { label: "2 days ago", date: new Date(Date.now() - 2 * 86400000).toISOString().split("T")[0] },
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, date: preset.date }))}
+              className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${
+                form.date === preset.date
+                  ? "bg-brand-600 text-white border-brand-600"
+                  : "bg-white text-gray-600 border-gray-300 hover:border-brand-300"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
         <input type="date" value={form.date}
           onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
           className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
