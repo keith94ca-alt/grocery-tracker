@@ -37,7 +37,7 @@ export default function RootLayout({
           <header className="bg-brand-600 text-white sticky top-0 z-40 shadow-md">
             <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-2">
               <span className="text-2xl">🛒</span>
-              <h1 className="text-lg font-bold tracking-tight">Price Tracker</h1>
+              <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
             </div>
           </header>
           <main className="max-w-lg mx-auto">{children}</main>
