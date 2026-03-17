@@ -3,6 +3,7 @@ import "./globals.css";
 import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientLayout from "@/components/ClientLayout";
+import FAB from "@/components/FAB";
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -46,6 +47,7 @@ export default function RootLayout({
           </main>
         </div>
         <BottomNav />
+        <FAB />
         <ServiceWorkerRegistrar />
       </body>
     </html>

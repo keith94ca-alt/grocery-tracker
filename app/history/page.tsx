@@ -70,7 +70,15 @@ export default function HistoryPage() {
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Price History</h2>
-        <span className="text-sm text-gray-500">{entries.length} entries</span>
+        <div className="flex items-center gap-3">
+          <a
+            href="/api/export"
+            className="text-xs text-brand-600 font-medium hover:underline"
+          >
+            📥 Export CSV
+          </a>
+          <span className="text-sm text-gray-500">{entries.length} entries</span>
+        </div>
       </div>
 
       <div className="space-y-2">

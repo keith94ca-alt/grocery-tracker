@@ -6,6 +6,7 @@ import { simplifyFlyerName } from "@/lib/flipp";
 import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route";
 import type { FlippItem } from "@/lib/flipp";
 import { FlyerCardSkeleton } from "@/components/Skeletons";
+import { useToast } from "@/components/Toast";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
@@ -476,7 +477,6 @@ function FlyerCard({
             </button>
             <button
               onClick={() => {
-                // Add to shopping list via localStorage
                 try {
                   const raw = localStorage.getItem("grocery-shopping-list");
                   const list: { id: string; name: string; checked: boolean; category: string; addedAt: number }[] = raw ? JSON.parse(raw) : [];
@@ -490,10 +490,13 @@ function FlyerCard({
                       addedAt: Date.now(),
                     });
                     localStorage.setItem("grocery-shopping-list", JSON.stringify(list));
+                    toast(`Added ${name} to list`, "success");
+                  } else {
+                    toast(`${name} is already on your list`, "info");
                   }
                 } catch { /* ignore */ }
               }}
-              className="px-2 py-1.5 rounded-lg text-xs bg-gray-100 hover:bg-brand-100 hover:text-brand-700 transition-colors"
+              className="px-2 py-1.5 rounded-lg text-xs bg-gray-100 hover:bg-brand-100 hover:text-brand-700 transition-colors active:scale-95"
               title="Add to shopping list"
             >
               🛒
@@ -515,6 +518,7 @@ export default function FlyerPage() {
   const [filter, setFilter] = useState("");
   const [storeFilter, setStoreFilter] = useState("All");
   const [modal, setModal] = useState<ModalState | null>(null);
+  const { toast } = useToast();
   const [added, setAdded] = useState<Set<number>>(() => {
     try {
       const raw = sessionStorage.getItem("flyer-added");
@@ -552,6 +556,7 @@ export default function FlyerPage() {
   });
 
   function handleAdded(flippId: number, itemName: string) {
+    toast(`Added ${itemName}`, "success");
     setAdded((prev) => {
       const next = new Set(prev).add(flippId);
       try { sessionStorage.setItem("flyer-added", JSON.stringify([...next])); } catch {}
@@ -583,11 +588,16 @@ export default function FlyerPage() {
             setLoading(true);
             fetch("/api/flyer-items")
               .then((r) => r.json())
-              .then((d) => { if (Array.isArray(d)) setItems(d); })
-              .catch(() => {})
+              .then((d) => {
+                if (Array.isArray(d)) {
+                  setItems(d);
+                  toast(`Loaded ${d.length} flyer items`, "success");
+                }
+              })
+              .catch(() => toast("Failed to refresh", "error"))
               .finally(() => setLoading(false));
           }}
-          className="shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
+          className="shrink-0 px-3 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors active:scale-95"
         >
           ↻ Refresh
         </button>
