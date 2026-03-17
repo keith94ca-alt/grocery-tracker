@@ -277,10 +277,10 @@ export default function SearchPage() {
               </div>
               {flyerDeals.slice(0, 5).map((deal) => {
                 const unitsComparable = !!(
-                  deal.latestUnitPrice !== null &&
-                  deal.latestUnit &&
+                  deal.normalUnitPrice !== null &&
+                  deal.normalUnit &&
                   deal.flyerUnitPrice !== null &&
-                  deal.flyerUnit === deal.latestUnit
+                  deal.flyerUnit === deal.normalUnit
                 );
                 return (
                   <Link key={deal.itemId} href={`/item/${deal.itemId}`}
@@ -293,7 +293,7 @@ export default function SearchPage() {
                         </p>
                         {deal.savingsPercent !== null && (
                           <p className="text-xs font-medium mt-0.5 text-green-700">
-                            Save {deal.savingsPercent}% vs your last paid price
+                            Save {deal.savingsPercent}% vs your normal price
                           </p>
                         )}
                       </div>
@@ -323,7 +323,7 @@ export default function SearchPage() {
                     </div>
                     {unitsComparable && (
                       <div className="mt-2 pt-2 border-t border-green-100 flex items-center justify-between text-xs text-gray-500">
-                        <span>Your last: <strong>${deal.latestUnitPrice!.toFixed(2)}/{deal.latestUnit!.replace("per ", "")}</strong></span>
+                        <span>Your normal{deal.normalStore ? ` (${deal.normalStore})` : ""}: <strong>${deal.normalUnitPrice!.toFixed(2)}/{deal.normalUnit!.replace("per ", "")}</strong></span>
                         {deal.bestDeal.validTo && (
                           <span>Until {formatValidTo(deal.bestDeal.validTo)}</span>
                         )}
@@ -418,7 +418,7 @@ export default function SearchPage() {
                           <div className="mt-2 pt-2 border-t border-green-100 text-xs">
                             <p className="font-medium text-green-700">
                               {deal.savingsPercent !== null
-                                ? `Save ${deal.savingsPercent}% vs your last paid price`
+                                ? `Save ${deal.savingsPercent}% vs your normal price`
                                 : "On sale this week"}
                             </p>
                           </div>

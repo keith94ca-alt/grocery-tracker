@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { itemName, category, unit, price, quantity, store, date, notes, source } = body;
+    const { itemName, category, unit, price, quantity, store, date, notes, source, priceType } = body;
 
     if (!itemName?.trim()) {
       return NextResponse.json({ error: "Item name is required" }, { status: 400 });
@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     if (!store?.trim()) {
       return NextResponse.json({ error: "Store is required" }, { status: 400 });
     }
+
+    // Normalize priceType
+    const normalizedPriceType = priceType === "sale" ? "sale" : "normal";
 
     const parsedPrice = parseFloat(price);
     const parsedQty = parseFloat(quantity) || 1;
@@ -68,6 +71,7 @@ export async function POST(request: NextRequest) {
         unit: unit || "each",
         store: store.trim(),
         source: source || "manual",
+        priceType: normalizedPriceType,
         date: entryDate,
         notes: notes?.trim() || null,
       },

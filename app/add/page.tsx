@@ -86,6 +86,7 @@ function AddForm() {
     store: "",
     date: new Date().toISOString().split("T")[0],
     notes: "",
+    priceType: "normal",
   });
 
   const [packMode, setPackMode] = useState(false);
@@ -201,6 +202,7 @@ function AddForm() {
         store: prev.store,
         date: new Date().toISOString().split("T")[0],
         notes: "",
+        priceType: "normal",
       }));
       setPackMode(false);
       setPackCount("1");
@@ -481,6 +483,35 @@ function AddForm() {
         <input type="date" value={form.date}
           onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
           className="w-full px-3 py-3 rounded-xl border border-gray-300 bg-white text-base focus:outline-none focus:ring-2 focus:ring-brand-500" />
+      </div>
+
+      {/* Price type */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">Price type</label>
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setForm((prev) => ({ ...prev, priceType: "normal" }))}
+            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+              form.priceType === "normal"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500"
+            }`}
+          >
+            🏪 Normal
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm((prev) => ({ ...prev, priceType: "sale" }))}
+            className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+              form.priceType === "sale"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500"
+            }`}
+          >
+            🏷️ On Sale
+          </button>
+        </div>
       </div>
 
       {/* Notes */}

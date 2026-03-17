@@ -39,6 +39,7 @@ model PriceEntry {
   unit      String   @default("each")
   store     String
   source    String   @default("manual")
+  priceType String   @default("normal") // "normal" or "sale"
   date      DateTime
   notes     String?
   createdAt DateTime @default(now())

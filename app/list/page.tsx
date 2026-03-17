@@ -14,6 +14,7 @@ interface ShoppingItem {
   priceLogged: boolean;
   price?: number;
   priceExpanded?: boolean;
+  priceType?: string;
 }
 
 interface InlinePriceForm {
@@ -21,6 +22,7 @@ interface InlinePriceForm {
   quantity: string;
   unit: string;
   store: string;
+  priceType: string;
   saving: boolean;
 }
 
@@ -57,6 +59,7 @@ export default function ShoppingListPage() {
   const [suggestions, setSuggestions] = useState<{ id: number; name: string; category: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
+  const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,8 +68,9 @@ export default function ShoppingListPage() {
   useEffect(() => { setItems(loadList()); }, []);
   useEffect(() => { saveList(items); }, [items]);
 
-  // Load flyer deals on mount
+  // Load flyer deals and normal prices on mount
   useEffect(() => {
+    // Flyer deals
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data: DealResult[]) => {
@@ -76,6 +80,25 @@ export default function ShoppingListPage() {
           if (d.isCheaper) map.set(d.itemName.toLowerCase(), d);
         });
         setFlyerDeals(map);
+      })
+      .catch(() => {});
+
+    // Normal prices for all tracked items
+    fetch("/api/items")
+      .then((r) => r.json())
+      .then(async (itemData) => {
+        if (!Array.isArray(itemData)) return;
+        const names = itemData.map((i: { name: string }) => i.name);
+        if (names.length === 0) return;
+        const res = await fetch(`/api/normal-prices?names=${encodeURIComponent(names.join(","))}`);
+        const normals: { itemName: string; price: number; unit: string; store: string }[] = await res.json();
+        if (Array.isArray(normals)) {
+          const map = new Map<string, { price: number; unit: string; store: string }>();
+          normals.forEach((n) => {
+            map.set(n.itemName.toLowerCase(), { price: n.price, unit: n.unit, store: n.store });
+          });
+          setNormalPrices(map);
+        }
       })
       .catch(() => {});
   }, []);
@@ -123,7 +146,7 @@ export default function ShoppingListPage() {
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: true, priceExpanded: true } : i)));
       setPriceForms((prev) => {
         const next = new Map(prev);
-        next.set(id, { price: "", quantity: "1", unit: "each", store: "", saving: false });
+        next.set(id, { price: "", quantity: "1", unit: "each", store: "", priceType: "normal", saving: false });
         return next;
       });
     } else {
@@ -181,6 +204,7 @@ export default function ShoppingListPage() {
           store: form.store.trim(),
           date: new Date().toISOString(),
           source: "manual",
+          priceType: form.priceType || "normal",
           notes: "Logged from shopping list",
         }),
       });
@@ -225,14 +249,18 @@ export default function ShoppingListPage() {
   // Find best flyer deal for an item (fuzzy match by name)
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
-    // Exact match first
     const exact = flyerDeals.get(lower);
     if (exact) return exact;
-    // Partial match: check if any deal's item name contains our item name or vice versa
     for (const [key, deal] of flyerDeals) {
       if (lower.includes(key) || key.includes(lower)) return deal;
     }
     return undefined;
+  }
+
+  // Find cheapest normal price for an item
+  function findNormalPrice(itemName: string): { price: number; unit: string; store: string } | undefined {
+    const lower = itemName.toLowerCase();
+    return normalPrices.get(lower);
   }
 
   const sorted = [...items].sort((a, b) => {
@@ -387,6 +415,7 @@ export default function ShoppingListPage() {
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">{category}</h3>
               {catItems.map((item) => {
                 const deal = !item.checked ? findFlyerDeal(item.name) : undefined;
+                const normalPrice = !item.checked && !deal ? findNormalPrice(item.name) : undefined;
                 const form = priceForms.get(item.id);
                 const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
                   ? (parseFloat(form.price) / parseFloat(form.quantity || "1")).toFixed(2)
@@ -435,6 +464,14 @@ export default function ShoppingListPage() {
                             {deal.savingsPercent && (
                               <span className="text-xs text-green-600">↓{deal.savingsPercent}%</span>
                             )}
+                          </div>
+                        )}
+                        {/* Cheapest normal price line (when no flyer deal) */}
+                        {!deal && !item.checked && normalPrice && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-gray-500">
+                              🏪 Normal ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} at {normalPrice.store}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -496,6 +533,34 @@ export default function ShoppingListPage() {
                             onChange={(e) => updatePriceForm(item.id, "store", e.target.value)}
                             placeholder="e.g., Costco"
                             className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                        </div>
+                        {/* Normal / Sale toggle */}
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-0.5">Price type</label>
+                          <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => updatePriceForm(item.id, "priceType", "normal")}
+                              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                form.priceType === "normal"
+                                  ? "bg-white text-gray-900 shadow-sm"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              🏪 Normal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updatePriceForm(item.id, "priceType", "sale")}
+                              className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                form.priceType === "sale"
+                                  ? "bg-white text-gray-900 shadow-sm"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              🏷️ On Sale
+                            </button>
+                          </div>
                         </div>
                         {/* Unit price preview */}
                         {unitPrice && (

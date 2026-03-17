@@ -169,7 +169,7 @@ function AllDealsModal({ deals, onClose }: { deals: FlippItem[]; onClose: () => 
 }
 
 function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () => void }) {
-  const { bestDeal, latestUnitPrice, latestUnit, savingsPercent, isCheaper,
+  const { bestDeal, normalUnitPrice, normalUnit, normalStore, savingsPercent, isCheaper,
           flyerUnitPrice, flyerUnit, allDeals } = deal;
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
   const validFrom = bestDeal.validFrom
@@ -187,7 +187,7 @@ function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () 
     : { bg: "bg-gray-50", border: "border-gray-200", heading: "text-gray-700",
         price: "text-gray-800", divider: "border-gray-100" };
 
-  const canCompare = flyerUnitPrice !== null && latestUnitPrice !== null && flyerUnit === latestUnit;
+  const canCompare = flyerUnitPrice !== null && normalUnitPrice !== null && flyerUnit === normalUnit;
 
   return (
     <>
@@ -241,14 +241,14 @@ function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () 
         <div className="flex gap-3 flex-wrap">
           {canCompare && (
             <span className="text-gray-500">
-              Your last:{" "}
+              Your normal{normalStore ? ` (${normalStore})` : ""}:{" "}
               <strong className="text-gray-700">
-                ${latestUnitPrice!.toFixed(2)}/{latestUnit!.replace("per ", "")}
+                ${normalUnitPrice!.toFixed(2)}/{normalUnit!.replace("per ", "")}
               </strong>
             </span>
           )}
           {isCheaper && savingsPercent !== null && savingsPercent > 0 && (
-            <span className="text-green-600 font-bold">Save {savingsPercent}% vs your last price</span>
+            <span className="text-green-600 font-bold">Save {savingsPercent}% vs your normal price</span>
           )}
           {flyerUnitPrice === null && (
             <span className="text-gray-400">
