@@ -11,6 +11,11 @@ const navItems = [
   { href: "/list", label: "List", icon: "🛒" },
 ];
 
+const sideItems = [
+  { href: "/stores", label: "Stores", icon: "🏪" },
+  { href: "/history", label: "History", icon: "📋" },
+];
+
 export default function BottomNav() {
   const pathname = usePathname();
 
@@ -77,18 +82,24 @@ export default function BottomNav() {
             );
           })}
         </div>
-        <div className="p-4 border-t border-gray-100">
-          <Link
-            href="/history"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              pathname.startsWith("/history")
-                ? "bg-brand-50 text-brand-700"
-                : "text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            <span>📋</span>
-            <span>Price History</span>
-          </Link>
+        <div className="p-4 border-t border-gray-100 space-y-1">
+          {sideItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-brand-50 text-brand-700"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
       </nav>
     </>
