@@ -65,11 +65,12 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { name, category, unit, watched } = body as {
+    const { name, category, unit, watched, targetPrice } = body as {
       name?: string;
       category?: string;
       unit?: string;
       watched?: boolean;
+      targetPrice?: number | null;
     };
 
     // Build partial update — only include fields that were provided
@@ -78,6 +79,7 @@ export async function PATCH(
     if (category !== undefined) data.category = category;
     if (unit !== undefined) data.unit = unit;
     if (watched !== undefined) data.watched = watched;
+    if (targetPrice !== undefined) data.targetPrice = targetPrice || null;
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });

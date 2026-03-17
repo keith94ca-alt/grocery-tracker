@@ -14,6 +14,7 @@ model Item {
   category     String       @default("Other")
   unit         String       @default("each")
   watched      Boolean      @default(false)
+  targetPrice  Float?       // User's target price for this item (optional)
   createdAt    DateTime     @default(now())
   priceEntries PriceEntry[]
   flyerNotes   FlyerNote[]

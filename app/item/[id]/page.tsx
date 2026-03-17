@@ -26,6 +26,7 @@ interface ItemDetail {
   name: string;
   category: string;
   unit: string;
+  targetPrice: number | null;
   priceEntries: PriceEntry[];
   stats: {
     avg: number;
@@ -294,6 +295,8 @@ export default function ItemPage() {
   const [allDeals, setAllDeals] = useState<FlippItem[]>([]);
   const [showDealsModal, setShowDealsModal] = useState(false);
   const [undoStack, setUndoStack] = useState<{ entry: PriceEntry; index: number }[]>([]);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState("");
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -319,6 +322,24 @@ export default function ItemPage() {
       })
       .catch(() => {});
   }, [params.id]);
+
+  async function saveTargetPrice(price: number | null) {
+    try {
+      const res = await fetch(`/api/items/${params.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPrice: price }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setItem((prev) => prev ? { ...prev, targetPrice: updated.targetPrice } : prev);
+        toast(price ? `Target price set to $${price.toFixed(2)}` : "Target price cleared", "success");
+      }
+    } catch {
+      toast("Failed to save target price", "error");
+    }
+    setEditingTarget(false);
+  }
 
   async function deleteEntry(entryId: number) {
     setDeletingId(entryId);
@@ -396,6 +417,80 @@ export default function ItemPage() {
 
       {/* Flyer deal banner — appears when Flipp has a match */}
       {deal && <FlyerDealBanner deal={deal} onViewAll={() => setShowDealsModal(true)} />}
+
+      {/* Target price */}
+      {editingTarget ? (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-medium text-blue-800">Set your target price per {canonicalUnit.replace("per ", "")}</p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              value={targetInput}
+              onChange={(e) => setTargetInput(e.target.value)}
+              placeholder={item.targetPrice?.toFixed(2) || "0.00"}
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              autoFocus
+              className="flex-1 px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button onClick={() => saveTargetPrice(parseFloat(targetInput) || null)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold">
+              Save
+            </button>
+            <button onClick={() => setEditingTarget(false)}
+              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-xl text-sm font-medium">
+              ✕
+            </button>
+          </div>
+          {item.targetPrice && (
+            <p className="text-xs text-blue-600">Current target: ${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</p>
+          )}
+        </div>
+      ) : item.targetPrice && item.stats ? (() => {
+        const latestUnit = latest?.unitPrice ?? 0;
+        const belowTarget = latestUnit > 0 && latestUnit <= item.targetPrice;
+        const pctDiff = latestUnit > 0 ? ((latestUnit - item.targetPrice) / item.targetPrice * 100).toFixed(1) : null;
+        return (
+          <div
+            onClick={() => { setEditingTarget(true); setTargetInput(item.targetPrice!.toFixed(2)); }}
+            className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+              belowTarget
+                ? "bg-green-50 border-green-200"
+                : "bg-orange-50 border-orange-200"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  🎯 Target: <strong>${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</strong>
+                </p>
+                {pctDiff !== null && (
+                  <p className={`text-xs font-medium mt-0.5 ${belowTarget ? "text-green-700" : "text-orange-700"}`}>
+                    {belowTarget
+                      ? `✅ ${Math.abs(parseFloat(pctDiff)).toFixed(0)}% below your target!`
+                      : `📈 ${parseFloat(pctDiff).toFixed(0)}% above your target`}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); saveTargetPrice(null); }}
+                className="text-gray-400 hover:text-red-500 text-sm"
+                title="Remove target"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        );
+      })() : !editingTarget && !item.targetPrice && item.stats ? (
+        <button
+          onClick={() => setEditingTarget(true)}
+          className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-brand-300 hover:text-brand-600 transition-colors"
+        >
+          🎯 Set a target price
+        </button>
+      ) : null}
 
       {/* Deal indicator (latest manual entry vs own historical average) */}
       {item.stats && latest && item.priceEntries.length >= 3 && (
