@@ -280,13 +280,18 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   if (trackedKw.size <= 1) return true;
 
   // Stage 2 — bidirectional Jaccard similarity (multi-keyword items only)
+  // Lower threshold for 2-keyword items (e.g. "Pork Loin") since compound
+  // flyer items have many extra words that dilute the score
+  const jaccardThreshold = trackedKw.size <= 2 ? 0.25 : 0.35;
   const intersect = fuzzyIntersect(trackedKw, flippKw);
   const union = trackedKw.size + flippKw.size - intersect;
-  if (union === 0 || intersect / union < 0.35) return false;
+  if (union === 0 || intersect / union < jaccardThreshold) return false;
 
-  // Stage 3 — tracked keywords must cover at least 50% of flyer keywords
+  // Stage 3 — tracked keywords must cover enough flyer keywords
+  // Lower threshold for 2-keyword items (compound flyer deals have many words)
+  const coverageThreshold = trackedKw.size <= 2 ? 0.28 : 0.5;
   const coverage = intersect / flippKw.size;
-  return coverage >= 0.5;
+  return coverage >= coverageThreshold;
 }
 
 /** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */
