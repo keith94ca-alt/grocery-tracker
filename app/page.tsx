@@ -190,6 +190,39 @@ export default function HomePage() {
         </Link>
       </div>
 
+      {/* Price Alerts */}
+      {(() => {
+        // Check if any deals beat target prices
+        const alerts: { deal: DealResult; targetPrice: number }[] = [];
+        for (const deal of activeDeals) {
+          const item = items.find(i => i.name.toLowerCase() === deal.itemName.toLowerCase());
+          if (item?.targetPrice && deal.flyerUnitPrice && deal.flyerUnit) {
+            // Compare normalized prices
+            const targetNorm = item.targetPrice;
+            if (deal.flyerUnitPrice <= targetNorm) {
+              alerts.push({ deal, targetPrice: targetNorm });
+            }
+          }
+        }
+        if (alerts.length === 0) return null;
+        return (
+          <section className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+            <h2 className="text-sm font-semibold text-amber-800 uppercase tracking-wide">🎯 Price Alerts</h2>
+            <p className="text-xs text-amber-700">These items are below your target price this week!</p>
+            {alerts.map(({ deal, targetPrice }) => (
+              <Link key={deal.itemId} href={`/item/${deal.itemId}`}
+                className="flex items-center justify-between bg-white rounded-lg px-3 py-2 hover:shadow-sm transition-shadow">
+                <span className="text-sm font-medium text-gray-900">{deal.itemName}</span>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-green-700">${deal.flyerUnitPrice?.toFixed(2)}</span>
+                  <span className="text-xs text-gray-400 ml-1">target: ${targetPrice.toFixed(2)}</span>
+                </div>
+              </Link>
+            ))}
+          </section>
+        );
+      })()}
+
       {/* Deals This Week */}
       <section>
         <div className="flex items-center justify-between mb-2">

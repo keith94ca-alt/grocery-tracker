@@ -2,7 +2,7 @@
 
 export function SkeletonBar({ className = "" }: { className?: string }) {
   return (
-    <div className={`bg-gray-200 rounded animate-pulse ${className}`} />
+    <div className={`bg-gray-200 rounded skeleton ${className}`} />
   );
 }
 
