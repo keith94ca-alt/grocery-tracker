@@ -5,6 +5,7 @@ import Link from "next/link";
 import Fuse from "fuse.js";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import { useToast } from "@/components/Toast";
+import { normalizePrice } from "@/lib/units";
 
 interface PriceEntry {
   id: number;
@@ -425,19 +426,22 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="space-y-1.5">
-            {recentEntries.slice(0, 5).map((entry) => (
-              <Link key={entry.id} href={`/item/${entry.itemId}`}
-                className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:shadow-sm transition-shadow active:scale-[0.98]">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{entry.item.name}</p>
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-0.5">{entry.store} · {timeAgo(entry.date)}</p>
-                </div>
-                <span className="text-sm font-bold text-brand-600 dark:text-brand-500 shrink-0 ml-3">
-                  ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-400">/{entry.unit.replace("per ", "")}</span>
-                </span>
-              </Link>
-            ))}
+            {recentEntries.slice(0, 5).map((entry) => {
+              const norm = normalizePrice(entry.unitPrice, entry.unit);
+              return (
+                <Link key={entry.id} href={`/item/${entry.itemId}`}
+                  className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:shadow-sm transition-shadow active:scale-[0.98]">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{entry.item.name}</p>
+                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-0.5">{entry.store} · {timeAgo(entry.date)}</p>
+                  </div>
+                  <span className="text-sm font-bold text-brand-600 dark:text-brand-500 shrink-0 ml-3">
+                    ${norm.price.toFixed(2)}
+                    <span className="text-xs font-normal text-gray-400">/{norm.unit.replace("per ", "")}</span>
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { HistoryEntrySkeleton } from "@/components/Skeletons";
+import { normalizePrice } from "@/lib/units";
 
 interface Entry {
   id: number;
@@ -240,7 +241,9 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
-          {visible.map((entry) => (
+          {visible.map((entry) => {
+              const norm = normalizePrice(entry.unitPrice, entry.unit);
+              return (
             <Link
               key={entry.id}
               href={`/item/${entry.itemId}`}
@@ -257,8 +260,8 @@ export default function HistoryPage() {
                 </div>
                 <div className="text-right ml-3">
                   <p className="font-bold text-brand-600">
-                    ${entry.unitPrice.toFixed(2)}
-                    <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
+                    ${norm.price.toFixed(2)}
+                    <span className="text-xs font-normal text-gray-500">/{norm.unit.replace("per ", "")}</span>
                   </p>
                   {entry.quantity !== 1 && (
                     <p className="text-xs text-gray-400">${entry.price.toFixed(2)} total</p>
@@ -266,8 +269,9 @@ export default function HistoryPage() {
                 </div>
               </div>
             </Link>
-          ))}
-        </div>
+              );
+            })}
+          </div>
       )}
 
       {hasMore && (

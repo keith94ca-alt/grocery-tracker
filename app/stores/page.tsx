@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
+import { normalizePrice } from "@/lib/units";
 
 interface StoreEntry {
   id: number;
@@ -45,10 +46,11 @@ export default function StoresPage() {
   const storeStats = useMemo(() => {
     const map = new Map<string, StoreStats>();
     entries.forEach((e) => {
+        const pn = normalizePrice(e.unitPrice, e.unit || e.item.unit);
       const existing = map.get(e.store);
       if (existing) {
         existing.totalEntries++;
-        existing.avgUnitPrice = (existing.avgUnitPrice * (existing.totalEntries - 1) + e.unitPrice) / existing.totalEntries;
+        existing.avgUnitPrice = (existing.avgUnitPrice * (existing.totalEntries - 1) + pn.price) / existing.totalEntries;
         existing.categories.add(e.item.category);
         // Track unique items
         if (!existing.bestDeals.some((d) => d.name === e.item.name)) {
@@ -56,12 +58,12 @@ export default function StoresPage() {
         }
         // Track this item if it's cheaper than existing best deals for this store
         const existingBest = existing.bestDeals.find((d) => d.name === e.item.name);
-        if (!existingBest || e.unitPrice < existingBest.unitPrice) {
+        if (!existingBest || pn.price < existingBest.unitPrice) {
           if (existingBest) {
-            existingBest.unitPrice = e.unitPrice;
-            existingBest.unit = e.unit;
+            existingBest.unitPrice = pn.price;
+            existingBest.unit = pn.unit;
           } else {
-            existing.bestDeals.push({ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit });
+            existing.bestDeals.push({ name: e.item.name, unitPrice: pn.price, unit: pn.unit });
           }
         }
       } else {
@@ -69,8 +71,8 @@ export default function StoresPage() {
           name: e.store,
           itemCount: 1,
           totalEntries: 1,
-          avgUnitPrice: e.unitPrice,
-          bestDeals: [{ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit }],
+          avgUnitPrice: pn.price,
+          bestDeals: [{ name: e.item.name, unitPrice: pn.price, unit: pn.unit }],
           categories: new Set([e.item.category]),
         });
       }
@@ -179,7 +181,9 @@ export default function StoresPage() {
 
         {/* Entries list */}
         <div className="space-y-2">
-          {storeEntries.map((entry) => (
+          {storeEntries.map((entry) => {
+              const pn = normalizePrice(entry.unitPrice, entry.unit || entry.item.unit);
+              return (
             <Link
               key={entry.id}
               href={`/item/${entry.itemId}`}
@@ -191,12 +195,13 @@ export default function StoresPage() {
                   <p className="text-xs text-gray-500 mt-0.5">{entry.item.category} · {formatDate(entry.date)}</p>
                 </div>
                 <p className="font-bold text-brand-600 text-right">
-                  ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
+                  ${pn.price.toFixed(2)}
+                  <span className="text-xs font-normal text-gray-500">/{pn.unit.replace("per ", "")}</span>
                 </p>
               </div>
             </Link>
-          ))}
+              );
+            })}
         </div>
       </div>
     );
