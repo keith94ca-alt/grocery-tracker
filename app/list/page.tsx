@@ -1,22 +1,21 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
 
-interface ShoppingItem {
+interface ShoppingListItem {
   id: string;
   name: string;
   checked: boolean;
   category: string;
-  addedAt: number;
   priceLogged: boolean;
   price?: number;
   priceExpanded?: boolean;
-  priceType?: string;
+  sortOrder?: number;
 }
 
 interface InlinePriceForm {
@@ -36,24 +35,9 @@ const CATEGORIES = [
 
 const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
 
-const STORAGE_KEY = "grocery-shopping-list";
-
-function loadList(): ShoppingItem[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveList(items: ShoppingItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
-
 export default function ShoppingListPage() {
-  const [items, setItems] = useState<ShoppingItem[]>([]);
+  const [items, setItems] = useState<ShoppingListItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState("Other");
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
@@ -70,25 +54,39 @@ export default function ShoppingListPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => { setItems(loadList()); }, []);
-  useEffect(() => { saveList(items); }, [items]);
-
-  // Load flyer deals and normal prices on mount
+  // Load from API
   useEffect(() => {
-    // Flyer deals
+    fetch("/api/shopping-list")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setItems(data.map((d: { id: number; name: string; category: string; checked: boolean; priceLogged: boolean; price: number | null; sortOrder: number }) => ({
+            id: String(d.id),
+            name: d.name,
+            category: d.category,
+            checked: d.checked,
+            priceLogged: d.priceLogged,
+            price: d.price ?? undefined,
+            sortOrder: d.sortOrder,
+          })));
+        }
+      })
+      .catch(() => toast("Failed to load shopping list", "error"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Load flyer deals and normal prices
+  useEffect(() => {
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data: DealResult[]) => {
         if (!Array.isArray(data)) return;
         const map = new Map<string, DealResult>();
-        data.forEach((d) => {
-          if (d.isCheaper) map.set(d.itemName.toLowerCase(), d);
-        });
+        data.forEach((d) => { if (d.isCheaper) map.set(d.itemName.toLowerCase(), d); });
         setFlyerDeals(map);
       })
       .catch(() => {});
 
-    // Normal prices for all tracked items
     fetch("/api/items")
       .then((r) => r.json())
       .then(async (itemData) => {
@@ -99,22 +97,19 @@ export default function ShoppingListPage() {
         const normals: { itemName: string; price: number; unit: string; store: string }[] = await res.json();
         if (Array.isArray(normals)) {
           const map = new Map<string, { price: number; unit: string; store: string }>();
-          normals.forEach((n) => {
-            map.set(n.itemName.toLowerCase(), { price: n.price, unit: n.unit, store: n.store });
-          });
+          normals.forEach((n) => { map.set(n.itemName.toLowerCase(), { price: n.price, unit: n.unit, store: n.store }); });
           setNormalPrices(map);
         }
       })
       .catch(() => {});
   }, []);
 
-  // After items load, check flyer deals for untracked items
+  // Check flyer deals for untracked items
   useEffect(() => {
     if (items.length === 0) return;
     const trackedLower = new Set(Array.from(flyerDeals.keys()));
     const toCheck = items.filter((i) => !trackedLower.has(i.name.toLowerCase()));
     if (toCheck.length === 0) return;
-
     let cancelled = false;
     async function checkUntracked() {
       const results = new Map<string, FlyerMatch>();
@@ -127,9 +122,7 @@ export default function ShoppingListPage() {
           }
         } catch {}
       }
-      if (!cancelled && results.size > 0) {
-        setUntrackedFlyerDeals(results);
-      }
+      if (!cancelled && results.size > 0) setUntrackedFlyerDeals(results);
     }
     checkUntracked();
     return () => { cancelled = true; };
@@ -149,46 +142,60 @@ export default function ShoppingListPage() {
     }, 250);
   }
 
-  function addItem(name: string, category?: string) {
+  async function addItem(name: string, category?: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
+    // Don't add duplicates that are unchecked
     if (items.some((i) => i.name.toLowerCase() === trimmed.toLowerCase() && !i.checked)) return;
 
-    const newItem: ShoppingItem = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      name: trimmed,
-      checked: false,
-      category: category || newCategory,
-      addedAt: Date.now(),
-      priceLogged: false,
-    };
-    setItems((prev) => [newItem, ...prev]);
-    setNewName("");
-    setSuggestions([]);
-    setShowSuggestions(false);
-    inputRef.current?.focus();
+    try {
+      const res = await fetch("/api/shopping-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed, category: category || newCategory }),
+      });
+      if (!res.ok) { toast("Failed to add item", "error"); return; }
+      const data = await res.json();
+      setItems((prev) => [{
+        id: String(data.id),
+        name: data.name,
+        category: data.category,
+        checked: data.checked,
+        priceLogged: data.priceLogged,
+        sortOrder: data.sortOrder,
+      }, ...prev]);
+      setNewName("");
+      setSuggestions([]);
+      setShowSuggestions(false);
+      inputRef.current?.focus();
+    } catch {
+      toast("Failed to add item", "error");
+    }
   }
 
-  function toggleItem(id: string) {
+  async function toggleItem(id: string) {
     const item = items.find((i) => i.id === id);
     if (!item) return;
 
-    if (!item.checked) {
-      // Checking: expand price form
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: true, priceExpanded: true } : i)));
-      setPriceForms((prev) => {
-        const next = new Map(prev);
-        next.set(id, { price: "", quantity: "1", unit: "each", store: "", priceType: "normal", saving: false });
-        return next;
+    const newChecked = !item.checked;
+    try {
+      await fetch(`/api/shopping-list/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checked: newChecked }),
       });
-    } else {
-      // Unchecking: collapse and clear form
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, checked: false, priceLogged: false, priceExpanded: false } : i)));
-      setPriceForms((prev) => {
-        const next = new Map(prev);
-        next.delete(id);
-        return next;
-      });
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, checked: newChecked, priceExpanded: newChecked } : i))
+      );
+      if (newChecked) {
+        setPriceForms((prev) => {
+          const next = new Map(prev);
+          next.set(id, { price: "", quantity: "1", unit: "each", store: "", priceType: "normal", saving: false });
+          return next;
+        });
+      }
+    } catch {
+      toast("Failed to update item", "error");
     }
   }
 
@@ -245,6 +252,12 @@ export default function ShoppingListPage() {
         toast(data.error || "Failed to save", "error");
         return;
       }
+      // Update the item in the list
+      await fetch(`/api/shopping-list/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceLogged: true, price: p }),
+      });
       setItems((prev) =>
         prev.map((i) => (i.id === id ? { ...i, priceLogged: true, price: p, priceExpanded: false } : i))
       );
@@ -261,24 +274,44 @@ export default function ShoppingListPage() {
     }
   }
 
-  function removeItem(id: string) {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    setPriceForms((prev) => {
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
+  async function removeItem(id: string) {
+    try {
+      await fetch(`/api/shopping-list/${id}`, { method: "DELETE" });
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      setPriceForms((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    } catch {
+      toast("Failed to remove item", "error");
+    }
   }
 
-  function clearChecked() {
+  async function clearChecked() {
     const removed = items.filter((i) => i.checked && !i.priceLogged).length;
-    setItems((prev) => prev.filter((i) => !i.checked || i.priceLogged));
-    if (removed > 0) toast(`Cleared ${removed} untracked items`, "info");
+    try {
+      await fetch("/api/shopping-list", { method: "DELETE" });
+      setItems((prev) => prev.filter((i) => !i.checked || i.priceLogged));
+      if (removed > 0) toast(`Cleared ${removed} untracked items`, "info");
+    } catch {
+      toast("Failed to clear items", "error");
+    }
   }
 
-  function clearAll() { setItems([]); }
+  async function clearAll() {
+    try {
+      // Delete all items one by one (or we could add a bulk delete endpoint)
+      for (const item of items) {
+        await fetch(`/api/shopping-list/${item.id}`, { method: "DELETE" });
+      }
+      setItems([]);
+      toast("List cleared", "info");
+    } catch {
+      toast("Failed to clear list", "error");
+    }
+  }
 
-  // Find best flyer deal for an item (tracked items)
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
     const exact = flyerDeals.get(lower);
@@ -289,15 +322,12 @@ export default function ShoppingListPage() {
     return undefined;
   }
 
-  // Find flyer deal for untracked items (direct flyer match)
   function findUntrackedFlyerDeal(itemName: string): FlyerMatch | undefined {
     return untrackedFlyerDeals.get(itemName.toLowerCase());
   }
 
-  // Find cheapest normal price for an item
   function findNormalPrice(itemName: string): { price: number; unit: string; store: string } | undefined {
-    const lower = itemName.toLowerCase();
-    return normalPrices.get(lower);
+    return normalPrices.get(itemName.toLowerCase());
   }
 
   const sorted = [...items].sort((a, b) => {
@@ -311,7 +341,7 @@ export default function ShoppingListPage() {
   const checkedCount = items.filter((i) => i.checked).length;
   const loggedCount = items.filter((i) => i.priceLogged).length;
 
-  const grouped = new Map<string, ShoppingItem[]>();
+  const grouped = new Map<string, ShoppingListItem[]>();
   filtered.forEach((item) => {
     const cat = item.category;
     if (!grouped.has(cat)) grouped.set(cat, []);
@@ -399,7 +429,7 @@ export default function ShoppingListPage() {
         )}
       </div>
 
-      {/* Clear all — top of list */}
+      {/* Clear all at top */}
       {items.length > 0 && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-gray-500">{items.length} {items.length === 1 ? "item" : "items"} · {uncheckedCount} to buy</span>
@@ -434,7 +464,11 @@ export default function ShoppingListPage() {
       )}
 
       {/* List */}
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          {[1,2,3].map(i => <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse"><div className="h-4 w-1/2 bg-gray-200 rounded" /></div>)}
+        </div>
+      ) : items.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-5xl mb-3">🛒</p>
           <p className="font-medium text-gray-600">Your shopping list is empty</p>
@@ -461,25 +495,18 @@ export default function ShoppingListPage() {
 
                 return (
                   <div key={item.id}>
-                    {/* Main item row */}
-                    <div
-                      className={`bg-white rounded-xl border px-4 py-3 flex items-center gap-3 transition-all ${
-                        item.checked
-                          ? item.priceLogged ? "border-green-200 bg-green-50/30" : "border-gray-100 opacity-70"
-                          : "border-gray-200 shadow-sm"
-                      }`}
-                    >
-                      {/* Checkbox */}
+                    <div className={`bg-white rounded-xl border px-4 py-3 flex items-center gap-3 transition-all ${
+                      item.checked
+                        ? item.priceLogged ? "border-green-200 bg-green-50/30" : "border-gray-100 opacity-70"
+                        : "border-gray-200 shadow-sm"
+                    }`}>
                       <button
                         onClick={() => toggleItem(item.id)}
                         className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all active:scale-90 ${
                           item.checked ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 hover:border-brand-400"
-                        }`}
-                      >
+                        }`}>
                         {item.checked && <span className="text-sm">✓</span>}
                       </button>
-
-                      {/* Name + status */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className={`text-sm ${item.checked && !item.priceLogged ? "line-through text-gray-400" : "font-medium text-gray-900"}`}>
@@ -489,58 +516,31 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {/* Tracked flyer deal — clickable */}
                         {trackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
-                            <button
-                              onClick={() => {
-                                if (trackedDeal.bestDeal.imageUrl) {
-                                  setLightboxImg({ src: trackedDeal.bestDeal.imageUrl, alt: trackedDeal.bestDeal.name });
-                                } else {
-                                  window.open(
-                                    trackedDeal.bestDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(trackedDeal.bestDeal.name)}`,
-                                    "_blank"
-                                  );
-                                }
-                              }}
-                              className="text-xs text-green-700 font-medium hover:underline flex items-center gap-1"
-                            >
+                            <span className="text-xs text-green-700 font-medium">
                               🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
                               {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
                                 ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
                                 : ""}
                               {" "}{trackedDeal.bestDeal.merchantName}
-                            </button>
+                            </span>
                             {trackedDeal.savingsPercent && (
                               <span className="text-xs text-green-600">↓{trackedDeal.savingsPercent}%</span>
                             )}
                           </div>
                         )}
-                        {/* Untracked flyer deal — clickable */}
                         {!trackedDeal && untrackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
-                            <button
-                              onClick={() => {
-                                if (untrackedDeal.imageUrl) {
-                                  setLightboxImg({ src: untrackedDeal.imageUrl, alt: untrackedDeal.name });
-                                } else {
-                                  window.open(
-                                    untrackedDeal.pageUrl ?? `https://flipp.com/search?q=${encodeURIComponent(untrackedDeal.name)}`,
-                                    "_blank"
-                                  );
-                                }
-                              }}
-                              className="text-xs text-green-700 font-medium hover:underline flex items-center gap-1"
-                            >
+                            <span className="text-xs text-green-700 font-medium">
                               🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
                               {untrackedDeal.unitPrice && untrackedDeal.unit
                                 ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
                                 : ""}
                               {" "}{untrackedDeal.merchantName}
-                            </button>
+                            </span>
                           </div>
                         )}
-                        {/* Cheapest normal price line (when no flyer deal) */}
                         {!trackedDeal && !untrackedDeal && !item.checked && normalPrice && (
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-gray-500">
@@ -549,31 +549,22 @@ export default function ShoppingListPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* Actions */}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Expand/collapse price form — arrow indicates collapsible */}
                         {item.checked && !item.priceLogged && (
-                          <button
-                            onClick={() => togglePriceForm(item.id)}
-                            className="px-2 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors"
-                          >
+                          <button onClick={() => togglePriceForm(item.id)}
+                            className="px-2 py-1 text-xs font-medium text-brand-600 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
                             {item.priceExpanded ? "▾" : "💰"}
                           </button>
                         )}
                         {item.priceLogged && <span className="text-xs text-green-600">✅</span>}
-                        {/* Remove button — hidden when price form is expanded */}
                         {!item.priceExpanded && (
                           <button onClick={() => setConfirmAction({ type: "removeItem", itemId: item.id, itemName: item.name })}
-                            className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1"
-                            title="Remove">
+                            className="text-gray-300 hover:text-red-400 text-lg leading-none transition-colors p-1" title="Remove">
                             ×
                           </button>
                         )}
                       </div>
                     </div>
-
-                    {/* Inline price form (expanded) */}
                     {item.checked && item.priceExpanded && !item.priceLogged && form && (
                       <div className="bg-white border border-brand-200 border-t-0 rounded-b-xl px-4 pb-3 pt-2 -mt-1 space-y-2 animate-fade-in">
                         <p className="text-xs font-medium text-gray-500">Log what you paid (optional)</p>
@@ -608,35 +599,23 @@ export default function ShoppingListPage() {
                             placeholder="e.g., Costco"
                             className="w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
                         </div>
-                        {/* Normal / Sale toggle */}
                         <div>
                           <label className="block text-xs text-gray-400 mb-0.5">Price type</label>
                           <div className="flex gap-1 p-0.5 bg-gray-100 rounded-lg">
-                            <button
-                              type="button"
-                              onClick={() => updatePriceForm(item.id, "priceType", "normal")}
+                            <button type="button" onClick={() => updatePriceForm(item.id, "priceType", "normal")}
                               className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                form.priceType === "normal"
-                                  ? "bg-white text-gray-900 shadow-sm"
-                                  : "text-gray-500"
-                              }`}
-                            >
+                                form.priceType === "normal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                              }`}>
                               🏪 Normal
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => updatePriceForm(item.id, "priceType", "sale")}
+                            <button type="button" onClick={() => updatePriceForm(item.id, "priceType", "sale")}
                               className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${
-                                form.priceType === "sale"
-                                  ? "bg-white text-gray-900 shadow-sm"
-                                  : "text-gray-500"
-                              }`}
-                            >
+                                form.priceType === "sale" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                              }`}>
                               🏷️ On Sale
                             </button>
                           </div>
                         </div>
-                        {/* Unit price preview */}
                         {unitPrice && (
                           <p className="text-xs text-green-700">
                             Unit price: <strong>${unitPrice}/{form.unit.replace("per ", "")}</strong>
@@ -662,7 +641,6 @@ export default function ShoppingListPage() {
         </div>
       )}
 
-      {/* Clear all */}
       {items.length > 0 && (
         <div className="pt-4 border-t border-gray-100 text-center">
           <button onClick={() => setConfirmAction({ type: "clearAll" })} className="text-sm text-gray-400 hover:text-red-500 font-medium">
@@ -676,12 +654,9 @@ export default function ShoppingListPage() {
         <>
           <div className="fixed inset-0 bg-black/70 z-[80]" onClick={() => setLightboxImg(null)} />
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={() => setLightboxImg(null)}>
-            <img
-              src={lightboxImg.src}
-              alt={lightboxImg.alt}
+            <img src={lightboxImg.src} alt={lightboxImg.alt}
               className="max-w-full max-h-full rounded-2xl object-contain shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            />
+              onClick={(e) => e.stopPropagation()} />
           </div>
         </>
       )}
@@ -701,9 +676,7 @@ export default function ShoppingListPage() {
               ? `This will remove ${checkedCount} checked item${checkedCount !== 1 ? "s" : ""} from your list. ${loggedCount > 0 ? `${loggedCount} with logged prices will stay in your price history. ` : ""}Items without prices will be deleted.`
               : `"${confirmAction.itemName}" will be removed from your shopping list. If you've logged a price for it, the price history will remain.`
           }
-          confirmLabel={
-            confirmAction.type === "removeItem" ? "Remove" : "Clear"
-          }
+          confirmLabel={confirmAction.type === "removeItem" ? "Remove" : "Clear"}
           onConfirm={() => {
             if (confirmAction.type === "clearAll") clearAll();
             else if (confirmAction.type === "clearChecked") clearChecked();

@@ -14,10 +14,11 @@ model Item {
   category     String       @default("Other")
   unit         String       @default("each")
   watched      Boolean      @default(false)
-  targetPrice  Float?       // User's target price for this item (optional)
-  createdAt    DateTime     @default(now())
-  priceEntries PriceEntry[]
-  flyerNotes   FlyerNote[]
+  targetPrice      Float?       // User's target price for this item (optional)
+  createdAt        DateTime     @default(now())
+  priceEntries     PriceEntry[]
+  flyerNotes       FlyerNote[]
+  shoppingListItems ShoppingListItem[]
 }
 
 model Store {
@@ -61,4 +62,18 @@ model FlyerNote {
   createdAt DateTime @default(now())
 
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+}
+
+model ShoppingListItem {
+  id         Int      @id @default(autoincrement())
+  name       String
+  category   String   @default("Other")
+  checked    Boolean  @default(false)
+  priceLogged Boolean @default(false)
+  price      Float?
+  itemId     Int?     // FK to Item if tracked
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  item       Item?    @relation(fields: [itemId], references: [id])
 }
