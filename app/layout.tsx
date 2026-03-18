@@ -4,6 +4,7 @@ import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientLayout from "@/components/ClientLayout";
 import FAB from "@/components/FAB";
+import DarkModeToggle from "@/components/DarkModeToggle";
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -37,9 +38,12 @@ export default function RootLayout({
       <body style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
         <div className="min-h-screen bg-gray-50 pb-20 lg:pb-0">
           <header className="bg-brand-600 text-white sticky top-0 z-40 shadow-md">
-            <div className="max-w-2xl lg:max-w-none mx-auto lg:ml-56 px-4 py-3 flex items-center gap-2">
-              <span className="text-2xl">🛒</span>
-              <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
+            <div className="max-w-2xl lg:max-w-none mx-auto lg:ml-56 px-4 py-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🛒</span>
+                <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
+              </div>
+              <DarkModeToggle />
             </div>
           </header>
           <main className="max-w-2xl lg:max-w-none mx-auto px-1 lg:px-6 lg:ml-56">

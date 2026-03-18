@@ -7,24 +7,69 @@
   --background-rgb: 249, 250, 251;
 }
 
-/* Dark mode via system preference */
+/* Dark mode: system preference OR manual toggle (html.dark) */
+.dark-mode-styles {
+  --foreground-rgb: 229, 231, 235;
+  --background-rgb: 17, 24, 39;
+}
+
+.dark-mode-styles .bg-white { background-color: #1f2937 !important; }
+.dark-mode-styles .border-gray-200 { border-color: #374151 !important; }
+.dark-mode-styles .border-gray-100 { border-color: #1f2937 !important; }
+.dark-mode-styles .text-gray-900 { color: #f3f4f6 !important; }
+.dark-mode-styles .text-gray-700 { color: #d1d5db !important; }
+.dark-mode-styles .text-gray-600 { color: #9ca3af !important; }
+.dark-mode-styles .text-gray-500 { color: #9ca3af !important; }
+.dark-mode-styles .text-gray-400 { color: #6b7280 !important; }
+.dark-mode-styles .bg-gray-50 { background-color: #111827 !important; }
+.dark-mode-styles .bg-gray-100 { background-color: #1f2937 !important; }
+.dark-mode-styles .border-gray-300 { border-color: #374151 !important; }
+.dark-mode-styles .bg-brand-50 { background-color: #14532d !important; }
+.dark-mode-styles .bg-green-50 { background-color: #14532d !important; }
+.dark-mode-styles .border-brand-200 { border-color: #166534 !important; }
+.dark-mode-styles .border-amber-200 { border-color: #854d0e !important; }
+.dark-mode-styles .bg-amber-50 { background-color: #422006 !important; }
+
+/* Apply dark mode via system preference */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not(.light) {
     --foreground-rgb: 229, 231, 235;
     --background-rgb: 17, 24, 39;
   }
-  .bg-white { background-color: #1f2937 !important; }
-  .border-gray-200 { border-color: #374151 !important; }
-  .border-gray-100 { border-color: #1f2937 !important; }
-  .text-gray-900 { color: #f3f4f6 !important; }
-  .text-gray-700 { color: #d1d5db !important; }
-  .text-gray-600 { color: #9ca3af !important; }
-  .text-gray-500 { color: #9ca3af !important; }
-  .text-gray-400 { color: #6b7280 !important; }
-  .bg-gray-50 { background-color: #111827 !important; }
-  .bg-gray-100 { background-color: #1f2937 !important; }
-  .border-gray-300 { border-color: #374151 !important; }
+  :root:not(.light) .bg-white { background-color: #1f2937 !important; }
+  :root:not(.light) .border-gray-200 { border-color: #374151 !important; }
+  :root:not(.light) .border-gray-100 { border-color: #1f2937 !important; }
+  :root:not(.light) .text-gray-900 { color: #f3f4f6 !important; }
+  :root:not(.light) .text-gray-700 { color: #d1d5db !important; }
+  :root:not(.light) .text-gray-600 { color: #9ca3af !important; }
+  :root:not(.light) .text-gray-500 { color: #9ca3af !important; }
+  :root:not(.light) .text-gray-400 { color: #6b7280 !important; }
+  :root:not(.light) .bg-gray-50 { background-color: #111827 !important; }
+  :root:not(.light) .bg-gray-100 { background-color: #1f2937 !important; }
+  :root:not(.light) .border-gray-300 { border-color: #374151 !important; }
 }
+
+/* Manual dark mode toggle */
+html.dark {
+  --foreground-rgb: 229, 231, 235;
+  --background-rgb: 17, 24, 39;
+}
+html.dark .bg-white { background-color: #1f2937 !important; }
+html.dark .border-gray-200 { border-color: #374151 !important; }
+html.dark .border-gray-100 { border-color: #1f2937 !important; }
+html.dark .text-gray-900 { color: #f3f4f6 !important; }
+html.dark .text-gray-700 { color: #d1d5db !important; }
+html.dark .text-gray-600 { color: #9ca3af !important; }
+html.dark .text-gray-500 { color: #9ca3af !important; }
+html.dark .text-gray-400 { color: #6b7280 !important; }
+html.dark .bg-gray-50 { background-color: #111827 !important; }
+html.dark .bg-gray-100 { background-color: #1f2937 !important; }
+html.dark .border-gray-300 { border-color: #374151 !important; }
+html.dark .bg-brand-50 { background-color: #14532d !important; }
+html.dark .bg-green-50 { background-color: #14532d !important; }
+html.dark .border-brand-200 { border-color: #166534 !important; }
+html.dark .border-amber-200 { border-color: #854d0e !important; }
+html.dark .bg-amber-50 { background-color: #422006 !important; }
 
 body {
   color: rgb(var(--foreground-rgb));
