@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { convertUnitPrice, sameUnitGroup } from "@/lib/units";
@@ -284,6 +284,132 @@ function formatDate(dateStr: string) {
   });
 }
 
+// ── Edit Price Entry Modal ────────────────────────────────────────────────────
+
+const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
+
+function EditPriceModal({
+  entry,
+  itemId,
+  onClose,
+  onSaved,
+}: {
+  entry: PriceEntry;
+  itemId: number;
+  onClose: () => void;
+  onSaved: (updated: PriceEntry) => void;
+}) {
+  const [price, setPrice] = useState(entry.price.toString());
+  const [quantity, setQuantity] = useState(entry.quantity.toString());
+  const [unit, setUnit] = useState(entry.unit);
+  const [store, setStore] = useState(entry.store);
+  const [notes, setNotes] = useState(entry.notes || "");
+  const [date, setDate] = useState(new Date(entry.date).toISOString().split("T")[0]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
+
+  const unitPrice = price && parseFloat(price) > 0 && quantity && parseFloat(quantity) > 0
+    ? (parseFloat(price) / parseFloat(quantity)).toFixed(2) : null;
+
+  async function handleSave() {
+    const p = parseFloat(price);
+    if (!p || p <= 0) { setError("Valid price required"); return; }
+    setSaving(true);
+    try {
+      // Delete old entry and create new one (simplest approach for editing)
+      await fetch(`/api/prices/${entry.id}`, { method: "DELETE" });
+      const res = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemId,
+          price: p,
+          quantity: parseFloat(quantity) || 1,
+          unit,
+          store: store.trim(),
+          date: new Date(date).toISOString(),
+          notes: notes.trim() || undefined,
+          source: entry.source || "manual",
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setError(d.error || "Failed to save");
+        return;
+      }
+      const created = await res.json();
+      toast("Entry updated", "success");
+      onSaved(created);
+    } catch {
+      setError("Network error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <h2 className="text-lg font-semibold text-gray-900">Edit Price Entry</h2>
+        {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)}
+                step="0.01" min="0" inputMode="decimal"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+              <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)}
+                step="0.01" min="0.01" inputMode="decimal"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+            <select value={unit} onChange={(e) => setUnit(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              {UNITS.map((u) => <option key={u}>{u}</option>)}
+            </select>
+          </div>
+          {unitPrice && (
+            <p className="text-sm text-green-700">Unit price: <strong>${unitPrice}/{unit.replace("per ", "")}</strong></p>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Store</label>
+            <input type="text" value={store} onChange={(e) => setStore(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ItemPage() {
   const params = useParams();
   const router = useRouter();
@@ -293,6 +419,7 @@ export default function ItemPage() {
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteEntry, setConfirmDeleteEntry] = useState<PriceEntry | null>(null);
+  const [editEntry, setEditEntry] = useState<PriceEntry | null>(null);
   const [deal, setDeal] = useState<DealResult | null>(null);
   const [allDeals, setAllDeals] = useState<FlippItem[]>([]);
   const [showDealsModal, setShowDealsModal] = useState(false);
@@ -656,11 +783,18 @@ export default function ItemPage() {
                     )}
                     {entry.notes && <p className="text-xs text-gray-500 mt-1 italic">{entry.notes}</p>}
                   </div>
-                  <button onClick={() => setConfirmDeleteEntry(entry)} disabled={deletingId === entry.id}
-                    className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors disabled:opacity-50"
-                    title="Delete entry">
-                    ×
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => setEditEntry(entry)}
+                      className="text-gray-300 hover:text-brand-600 text-base leading-none transition-colors p-1"
+                      title="Edit entry">
+                      ✏️
+                    </button>
+                    <button onClick={() => setConfirmDeleteEntry(entry)} disabled={deletingId === entry.id}
+                      className="text-gray-300 hover:text-red-400 text-xl leading-none transition-colors disabled:opacity-50 p-1"
+                      title="Delete entry">
+                      ×
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -679,6 +813,22 @@ export default function ItemPage() {
           confirmLabel="Delete"
           onConfirm={() => { deleteEntry(confirmDeleteEntry.id); setConfirmDeleteEntry(null); }}
           onCancel={() => setConfirmDeleteEntry(null)}
+        />
+      )}
+
+      {/* Edit price entry modal */}
+      {editEntry && (
+        <EditPriceModal
+          entry={editEntry}
+          itemId={item.id}
+          onClose={() => setEditEntry(null)}
+          onSaved={(updated) => {
+            setItem((prev) => prev ? {
+              ...prev,
+              priceEntries: prev.priceEntries.map((e) => e.id === editEntry.id ? updated : e),
+            } : prev);
+            setEditEntry(null);
+          }}
         />
       )}
     </div>

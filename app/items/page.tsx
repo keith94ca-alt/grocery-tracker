@@ -12,14 +12,13 @@ const CATEGORIES = [
   "Household", "Personal Care", "Other",
 ];
 
-const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
-
 interface ManagedItem {
   id: number;
   name: string;
   category: string;
   unit: string;
   watched: boolean;
+  targetPrice: number | null;
   _count: { priceEntries: number };
 }
 
@@ -35,7 +34,7 @@ function EditModal({
 }) {
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState(item.category);
-  const [unit, setUnit] = useState(item.unit);
+  const [targetPrice, setTargetPrice] = useState(item.targetPrice?.toString() || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -48,7 +47,11 @@ function EditModal({
       const res = await fetch(`/api/items/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), category, unit }),
+        body: JSON.stringify({
+          name: name.trim(),
+          category,
+          targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+        }),
       });
       if (res.status === 409) { setError("An item with that name already exists"); return; }
       if (!res.ok) { setError("Failed to save — try again"); return; }
@@ -72,49 +75,41 @@ function EditModal({
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
+            <select value={category} onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
               {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              {UNITS.map((u) => <option key={u}>{u}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Target Price <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+              <input type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)}
+                placeholder="e.g., 19.99" step="0.01" min="0" inputMode="decimal"
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Get alerted when a deal beats this price
+            </p>
           </div>
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
             {saving ? "Saving…" : "Save"}
           </button>
         </div>
@@ -152,7 +147,7 @@ function DeleteConfirm({
   return (
     <ConfirmDialog
       title={`Delete ${item.name}?`}
-      message={`This will permanently delete "${item.name}" and all ${item._count.priceEntries} price ${item._count.priceEntries === 1 ? "entry" : "entries"} you've logged for it. Your price history and averages for this item will be lost. Any flyer deals matching this item will no longer show comparisons.`}
+      message={`This will permanently delete "${item.name}" and all ${item._count.priceEntries} price ${item._count.priceEntries === 1 ? "entry" : "entries"} you've logged for it. Your price history and averages for this item will be lost.`}
       confirmLabel={deleting ? "Deleting…" : "Delete Item"}
       onConfirm={handleDelete}
       onCancel={onClose}
@@ -170,7 +165,7 @@ function WatchModal({
 }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("Other");
-  const [unit, setUnit] = useState("each");
+  const [targetPrice, setTargetPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<{ id: number; name: string }[]>([]);
@@ -178,7 +173,6 @@ function WatchModal({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  // Autocomplete: search existing items as user types
   function handleNameChange(val: string) {
     setName(val);
     setError(null);
@@ -202,7 +196,13 @@ function WatchModal({
       const res = await fetch("/api/items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), category, unit, watched: true }),
+        body: JSON.stringify({
+          name: name.trim(),
+          category,
+          unit: "each",
+          watched: true,
+          targetPrice: targetPrice ? parseFloat(targetPrice) : undefined,
+        }),
       });
       if (!res.ok) { setError("Failed to save — try again"); return; }
       const created = await res.json();
@@ -219,7 +219,7 @@ function WatchModal({
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Watch an Item</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            No price needed — we'll alert you when it hits the flyer.
+            Track items without logging a price. Get notified when deals appear.
           </p>
         </div>
 
@@ -228,28 +228,19 @@ function WatchModal({
         )}
 
         <div className="space-y-3">
-          {/* Name with autocomplete */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-1">Item name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
+            <input type="text" value={name} onChange={(e) => handleNameChange(e.target.value)}
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="e.g. Chicken Thighs"
-              autoFocus
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
+              placeholder="e.g. Chicken Thighs" autoFocus
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
             {showSuggestions && suggestions.length > 0 && (
               <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                 {suggestions.map((s) => (
                   <li key={s.id}>
-                    <button
-                      type="button"
-                      onMouseDown={() => { setName(s.name); setSuggestions([]); setShowSuggestions(false); }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                    >
+                    <button type="button" onMouseDown={() => { setName(s.name); setSuggestions([]); setShowSuggestions(false); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50">
                       {s.name}
                     </button>
                   </li>
@@ -260,39 +251,32 @@ function WatchModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
+            <select value={category} onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
               {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            >
-              {UNITS.map((u) => <option key={u}>{u}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Target Price <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+              <input type="number" value={targetPrice} onChange={(e) => setTargetPrice(e.target.value)}
+                placeholder="e.g., 19.99" step="0.01" min="0" inputMode="decimal"
+                className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            </div>
           </div>
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+          <button onClick={onClose}
+            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50"
-          >
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
             {saving ? "Saving…" : "⭐ Watch"}
           </button>
         </div>
@@ -317,6 +301,7 @@ export default function ItemsPage() {
   const [deleteItem, setDeleteItem] = useState<ManagedItem | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showWatchModal, setShowWatchModal] = useState(false);
+  const [flyerDeals, setFlyerDeals] = useState<Map<string, { price: number; store: string }>>(new Map());
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -333,6 +318,22 @@ export default function ItemsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Load flyer deals for watched items
+  useEffect(() => {
+    if (loading) return;
+    fetch("/api/flyer-deals")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const map = new Map<string, { price: number; store: string }>();
+        data.forEach((d: { itemName: string; bestDeal: { currentPrice: number; merchantName: string } }) => {
+          map.set(d.itemName.toLowerCase(), { price: d.bestDeal.currentPrice, store: d.bestDeal.merchantName });
+        });
+        setFlyerDeals(map);
+      })
+      .catch(() => {});
+  }, [loading]);
 
   async function toggleWatched(item: ManagedItem) {
     setTogglingId(item.id);
@@ -373,10 +374,8 @@ export default function ItemsPage() {
             )}
           </h1>
         </div>
-        <button
-          onClick={() => setShowWatchModal(true)}
-          className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-semibold"
-        >
+        <button onClick={() => setShowWatchModal(true)}
+          className="px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-semibold">
           ⭐ Watch
         </button>
       </div>
@@ -384,13 +383,9 @@ export default function ItemsPage() {
       {/* Search */}
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Search items…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-300 bg-white shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
       </div>
 
       {loading ? (
@@ -417,6 +412,7 @@ export default function ItemsPage() {
                   key={item.id}
                   item={item}
                   toggling={togglingId === item.id}
+                  flyerDeal={flyerDeals.get(item.name.toLowerCase())}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
@@ -438,6 +434,7 @@ export default function ItemsPage() {
                   key={item.id}
                   item={item}
                   toggling={togglingId === item.id}
+                  flyerDeal={flyerDeals.get(item.name.toLowerCase())}
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
@@ -448,20 +445,17 @@ export default function ItemsPage() {
         </div>
       )}
 
-      {/* Watch modal */}
+      {/* Modals */}
       {showWatchModal && (
         <WatchModal
           onClose={() => setShowWatchModal(false)}
           onAdded={(newItem) => {
-            setItems((prev) =>
-              [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name))
-            );
+            setItems((prev) => [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name)));
             setShowWatchModal(false);
           }}
         />
       )}
 
-      {/* Edit modal */}
       {editItem && (
         <EditModal
           item={editItem}
@@ -473,7 +467,6 @@ export default function ItemsPage() {
         />
       )}
 
-      {/* Delete confirmation */}
       {deleteItem && (
         <DeleteConfirm
           item={deleteItem}
@@ -492,12 +485,14 @@ export default function ItemsPage() {
 function ItemRow({
   item,
   toggling,
+  flyerDeal,
   onEdit,
   onDelete,
   onToggleWatch,
 }: {
   item: ManagedItem;
   toggling: boolean;
+  flyerDeal?: { price: number; store: string };
   onEdit: () => void;
   onDelete: () => void;
   onToggleWatch: () => void;
@@ -505,38 +500,40 @@ function ItemRow({
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm flex items-center gap-3">
       {/* Watch star */}
-      <button
-        onClick={onToggleWatch}
-        disabled={toggling}
+      <button onClick={onToggleWatch} disabled={toggling}
         className={`text-xl leading-none shrink-0 transition-opacity ${toggling ? "opacity-40" : ""}`}
-        title={item.watched ? "Remove from watchlist" : "Add to watchlist"}
-      >
+        title={item.watched ? "Remove from watchlist" : "Add to watchlist"}>
         {item.watched ? "⭐" : "☆"}
       </button>
 
       {/* Info */}
       <Link href={`/item/${item.id}`} className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
-        <p className="text-xs text-gray-500 mt-0.5">
-          {item.category} · {item.unit} · {item._count.priceEntries}{" "}
-          {item._count.priceEntries === 1 ? "entry" : "entries"}
-        </p>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs text-gray-500">
+            {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
+          </span>
+          {item.targetPrice && (
+            <span className="text-xs text-blue-600">🎯 ${item.targetPrice.toFixed(2)}</span>
+          )}
+          {flyerDeal && (
+            <span className="text-xs text-green-600 font-medium">
+              🏷️ ${flyerDeal.price.toFixed(2)} at {flyerDeal.store}
+            </span>
+          )}
+        </div>
       </Link>
 
       {/* Actions */}
       <div className="flex items-center gap-1 shrink-0">
-        <button
-          onClick={onEdit}
+        <button onClick={onEdit}
           className="p-2 text-gray-400 hover:text-brand-600 rounded-lg hover:bg-gray-50 transition-colors"
-          title="Edit"
-        >
+          title="Edit">
           ✏️
         </button>
-        <button
-          onClick={onDelete}
+        <button onClick={onDelete}
           className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-          title="Delete"
-        >
+          title="Delete">
           🗑️
         </button>
       </div>
