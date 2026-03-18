@@ -156,14 +156,41 @@
 
 1. Fix bugs (fuzzy matching, search, Coca-Cola)
 2. Pull-to-refresh + skeleton shimmer
-3. Desktop data density (grid layout on lg)
-4. Price alerts (target price comparison on load)
-5. Better search with suggestions
-6. Store trends improvements
-7. Unit normalization improvements (per dozen, bunch)
-8. Remember last store pre-fill
-9. Dark mode
-10. Empty state improvements (helpful CTAs on blank pages)
+3. Documentation: API reference, deployment guide, update GAMEPLAN.md
+4. Desktop data density (grid layout on lg)
+5. Price alerts (target price comparison on load)
+6. Better search with suggestions
+7. Store trends improvements
+8. Unit normalization improvements (per dozen, bunch)
+9. Remember last store pre-fill
+10. Dark mode
+11. Empty state improvements (helpful CTAs on blank pages)
+
+---
+
+## Documentation Tasks
+
+### API Reference (API_REFERENCE.md)
+- List all endpoints with methods, params, response shapes
+- Include example requests/responses
+- Document authentication (for when user management is added)
+
+### Deployment Guide (DEPLOYMENT.md)
+- How to deploy via Portainer
+- Webhook workflow for test environment
+- Database migration steps
+- Environment variables reference
+- Troubleshooting common issues
+
+### Update GAMEPLAN.md
+- Reflect current feature state (shopping list, normal/sale prices, target prices)
+- Update "What's New" section with overnight improvements
+- Mark completed features accurately
+
+### Update MEMORY.md
+- Add entries from recent sessions
+- Document new components and patterns
+- Note the NextAuth.js plan for user management
 
 ---
 
