@@ -743,9 +743,10 @@ export default function ItemPage() {
           <div className="space-y-2">
             {item.priceEntries.map((entry, idx) => {
               const entryUnit = entry.unit || item.unit;
-              const converted = sameUnitGroup(entryUnit, canonicalUnit) && entryUnit !== canonicalUnit
-                ? convertUnitPrice(entry.unitPrice, entryUnit, canonicalUnit)
-                : null;
+              const norm = sameUnitGroup(entryUnit, canonicalUnit)
+                ? convertUnitPrice(entry.unitPrice, entryUnit, canonicalUnit) ?? entry.unitPrice
+                : entry.unitPrice;
+              const showRaw = entryUnit !== canonicalUnit && sameUnitGroup(entryUnit, canonicalUnit);
               const isFlyer = entry.source === "flyer";
               const flyerExpired = isFlyer &&
                 new Date(entry.date).getTime() + 7 * 24 * 60 * 60 * 1000 < Date.now();
@@ -755,11 +756,11 @@ export default function ItemPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-gray-900">
-                        ${entry.unitPrice.toFixed(2)}/{entryUnit}
+                        ${norm.toFixed(2)}/{canonicalUnit.replace("per ", "")}
                       </p>
-                      {converted !== null && (
+                      {showRaw && (
                         <span className="text-xs text-gray-400">
-                          = ${converted.toFixed(2)}/{canonicalUnit}
+                          (${entry.unitPrice.toFixed(2)}/{entryUnit.replace("per ", "")})
                         </span>
                       )}
                       {idx === 0 && (

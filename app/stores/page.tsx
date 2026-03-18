@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
+import { normalizePrice } from "@/lib/units";
 
 interface StoreEntry {
   id: number;
@@ -48,29 +49,32 @@ export default function StoresPage() {
       const existing = map.get(e.store);
       if (existing) {
         existing.totalEntries++;
-        existing.avgUnitPrice = (existing.avgUnitPrice * (existing.totalEntries - 1) + e.unitPrice) / existing.totalEntries;
+        const norm = normalizePrice(e.unitPrice, e.unit || e.item.unit);
+        existing.avgUnitPrice = (existing.avgUnitPrice * (existing.totalEntries - 1) + norm.price) / existing.totalEntries;
         existing.categories.add(e.item.category);
         // Track unique items
         if (!existing.bestDeals.some((d) => d.name === e.item.name)) {
           existing.itemCount++;
         }
         // Track this item if it's cheaper than existing best deals for this store
+        const norm = normalizePrice(e.unitPrice, e.unit || e.item.unit);
         const existingBest = existing.bestDeals.find((d) => d.name === e.item.name);
-        if (!existingBest || e.unitPrice < existingBest.unitPrice) {
+        if (!existingBest || norm.price < existingBest.unitPrice) {
           if (existingBest) {
-            existingBest.unitPrice = e.unitPrice;
-            existingBest.unit = e.unit;
+            existingBest.unitPrice = norm.price;
+            existingBest.unit = norm.unit;
           } else {
-            existing.bestDeals.push({ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit });
+            existing.bestDeals.push({ name: e.item.name, unitPrice: norm.price, unit: norm.unit });
           }
         }
       } else {
+        const norm = normalizePrice(e.unitPrice, e.unit || e.item.unit);
         map.set(e.store, {
           name: e.store,
           itemCount: 1,
           totalEntries: 1,
-          avgUnitPrice: e.unitPrice,
-          bestDeals: [{ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit }],
+          avgUnitPrice: norm.price,
+          bestDeals: [{ name: e.item.name, unitPrice: norm.price, unit: norm.unit }],
           categories: new Set([e.item.category]),
         });
       }
@@ -191,8 +195,8 @@ export default function StoresPage() {
                   <p className="text-xs text-gray-500 mt-0.5">{entry.item.category} · {formatDate(entry.date)}</p>
                 </div>
                 <p className="font-bold text-brand-600 text-right">
-                  ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
+                  ${normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).price.toFixed(2)}
+                  <span className="text-xs font-normal text-gray-500">/{normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).unit}</span>
                 </p>
               </div>
             </Link>

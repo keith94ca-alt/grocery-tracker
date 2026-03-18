@@ -5,6 +5,7 @@ import Link from "next/link";
 import Fuse from "fuse.js";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import { useToast } from "@/components/Toast";
+import { normalizePrice } from "@/lib/units";
 
 interface PriceEntry {
   id: number;
@@ -433,8 +434,8 @@ export default function HomePage() {
                   <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-0.5">{entry.store} · {timeAgo(entry.date)}</p>
                 </div>
                 <span className="text-sm font-bold text-brand-600 dark:text-brand-500 shrink-0 ml-3">
-                  ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-400">/{entry.unit.replace("per ", "")}</span>
+                  ${normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).price.toFixed(2)}
+                  <span className="text-xs font-normal text-gray-400">/{normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).unit.replace("per ", "")}</span>
                 </span>
               </Link>
             ))}
