@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import { useToast } from "@/components/Toast";
@@ -57,9 +57,13 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [trackedItems, setTrackedItems] = useState<{ id: number; name: string; targetPrice: number | null }[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStartRef = useRef<{ y: number; time: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
+  function loadData() {
     // Load flyer deals
     fetch("/api/flyer-deals")
       .then((r) => r.json())
@@ -85,7 +89,43 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setEntriesLoading(false));
-  }, []);
+  }
+
+  function refreshData() {
+    setIsRefreshing(true);
+    setDealsLoading(true);
+    setEntriesLoading(true);
+    loadData();
+    setTimeout(() => setIsRefreshing(false), 800);
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  // Pull-to-refresh touch handlers
+  function handleTouchStart(e: React.TouchEvent) {
+    const y = e.touches[0].clientY;
+    const atTop = containerRef.current?.scrollTop === 0 || (containerRef.current?.scrollTop ?? 0) < 5;
+    if (atTop) {
+      touchStartRef.current = { y, time: Date.now() };
+    }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!touchStartRef.current) return;
+    const delta = e.touches[0].clientY - touchStartRef.current.y;
+    if (delta > 0 && delta < 150) {
+      setPullDistance(delta);
+    }
+  }
+
+  function handleTouchEnd() {
+    if (pullDistance > 80) {
+      refreshData();
+      toast("Refreshing…", "info", 1500);
+    }
+    setPullDistance(0);
+    touchStartRef.current = null;
+  }
 
   // Search with recent searches
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -115,7 +155,19 @@ export default function HomePage() {
   const activeDeals = deals.filter((d) => d.isCheaper || !d.normalUnitPrice);
 
   return (
-    <div className="px-4 py-4 space-y-6">
+    <div ref={containerRef} className="px-4 py-4 space-y-6"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}>
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div className="flex items-center justify-center py-3 transition-all duration-200"
+          style={{ height: isRefreshing ? 48 : Math.min(pullDistance, 80), opacity: isRefreshing ? 1 : Math.min(pullDistance / 80, 1) }}>
+          <span className={`text-sm font-medium text-gray-500 ${isRefreshing ? "animate-spin" : ""}`}>
+            {isRefreshing ? "⟳ Refreshing…" : pullDistance > 80 ? "Release to refresh" : "↓ Pull to refresh"}
+          </span>
+        </div>
+      )}
       {lightboxImg && (
         <div className="fixed inset-0 bg-black/70 z-[80]" onClick={() => setLightboxImg(null)}>
           <div className="fixed inset-0 z-[90] flex items-center justify-center p-6" onClick={() => setLightboxImg(null)}>
@@ -132,7 +184,7 @@ export default function HomePage() {
         <input type="search" value={searchQuery}
           onChange={(e) => { setSearchQuery(e.target.value); doSearch(e.target.value); }}
           placeholder="Search items…"
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 bg-white shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-300 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400 shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-brand-500"
           autoComplete="off" />
         {searchLoading && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin">⟳</span>}
       </div>
@@ -343,10 +395,10 @@ export default function HomePage() {
               <Link key={entry.id} href={`/item/${entry.itemId}`}
                 className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-4 py-3 hover:shadow-sm transition-shadow active:scale-[0.98]">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{entry.item.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{entry.store} · {timeAgo(entry.date)}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{entry.item.name}</p>
+                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-0.5">{entry.store} · {timeAgo(entry.date)}</p>
                 </div>
-                <span className="text-sm font-bold text-brand-600 shrink-0 ml-3">
+                <span className="text-sm font-bold text-brand-600 dark:text-brand-500 shrink-0 ml-3">
                   ${entry.unitPrice.toFixed(2)}
                   <span className="text-xs font-normal text-gray-400">/{entry.item.unit.replace("per ", "")}</span>
                 </span>

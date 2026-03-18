@@ -116,7 +116,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       </div>
 
       {/* Chart — responsive, bigger on desktop */}
-      <div className="bg-gray-50 rounded-xl p-4 -mx-1 lg:mx-0">
+      <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 -mx-1 lg:mx-0">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="w-full"
@@ -130,7 +130,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
               <g key={pct}>
                 <line
                   x1={PADDING_X} y1={y} x2={width - PADDING_X} y2={y}
-                  stroke="#e5e7eb" strokeWidth={1}
+                  className="stroke-gray-200 dark:stroke-gray-700"
                 />
                 <text x={PADDING_X - 4} y={y + 3} fontSize={8} fill="#9ca3af" textAnchor="end">
                   ${price.toFixed(2)}
@@ -156,7 +156,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
 
           {/* Dots */}
           {points.map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r={3} fill="#16a34a" stroke="white" strokeWidth={1.5} />
+            <circle key={i} cx={p.x} cy={p.y} r={3} fill="#16a34a" className="stroke-white dark:stroke-gray-800" strokeWidth={1.5} />
           ))}
 
           {/* Date labels on x-axis */}
@@ -181,7 +181,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
           <line
             x1={PADDING_X} y1={height - paddingBottom}
             x2={width - PADDING_X} y2={height - paddingBottom}
-            stroke="#d1d5db" strokeWidth={1}
+            className="stroke-gray-300 dark:stroke-gray-600"
           />
 
           <defs>

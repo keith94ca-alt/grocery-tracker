@@ -62,24 +62,24 @@ function DealIndicator({ price, unit, avg, canonicalUnit }: { price: number; uni
   const converted = convertUnitPrice(price, unit, canonicalUnit) ?? price;
   const ratio = converted / avg;
   if (ratio <= 0.9) return (
-    <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center">
+    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl p-4 text-center">
       <p className="text-3xl">🟢</p>
-      <p className="font-bold text-green-800 mt-1">Great Deal!</p>
-      <p className="text-sm text-green-700">{Math.round((1 - ratio) * 100)}% below your average</p>
+      <p className="font-bold text-green-800 dark:text-green-400 mt-1">Great Deal!</p>
+      <p className="text-sm text-green-700 dark:text-green-300">{Math.round((1 - ratio) * 100)}% below your average</p>
     </div>
   );
   if (ratio <= 1.1) return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-center">
+    <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 text-center">
       <p className="text-3xl">🟡</p>
-      <p className="font-bold text-yellow-800 mt-1">Average Price</p>
-      <p className="text-sm text-yellow-700">Within 10% of your average</p>
+      <p className="font-bold text-yellow-800 dark:text-yellow-400 mt-1">Average Price</p>
+      <p className="text-sm text-yellow-700 dark:text-yellow-300">Within 10% of your average</p>
     </div>
   );
   return (
-    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
+    <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-4 text-center">
       <p className="text-3xl">🔴</p>
-      <p className="font-bold text-red-800 mt-1">Above Average</p>
-      <p className="text-sm text-red-700">{Math.round((ratio - 1) * 100)}% above your average</p>
+      <p className="font-bold text-red-800 dark:text-red-400 mt-1">Above Average</p>
+      <p className="text-sm text-red-700 dark:text-red-300">{Math.round((ratio - 1) * 100)}% above your average</p>
     </div>
   );
 }
@@ -549,8 +549,8 @@ export default function ItemPage() {
 
       {/* Target price */}
       {editingTarget ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-          <p className="text-sm font-medium text-blue-800">Set your target price per {canonicalUnit.replace("per ", "")}</p>
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-2">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-400">Set your target price per {canonicalUnit.replace("per ", "")}</p>
           <div className="flex gap-2">
             <input
               type="number"
@@ -561,19 +561,19 @@ export default function ItemPage() {
               min="0"
               inputMode="decimal"
               autoFocus
-              className="flex-1 px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-blue-300 dark:border-blue-700 dark:bg-gray-700 dark:text-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <button onClick={() => saveTargetPrice(parseFloat(targetInput) || null)}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold">
               Save
             </button>
             <button onClick={() => setEditingTarget(false)}
-              className="px-4 py-2 border border-blue-300 text-blue-700 rounded-xl text-sm font-medium">
+              className="px-4 py-2 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-medium">
               ✕
             </button>
           </div>
           {item.targetPrice && (
-            <p className="text-xs text-blue-600">Current target: ${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">Current target: ${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</p>
           )}
         </div>
       ) : item.targetPrice && item.stats ? (() => {
@@ -585,17 +585,17 @@ export default function ItemPage() {
             onClick={() => { setEditingTarget(true); setTargetInput(item.targetPrice!.toFixed(2)); }}
             className={`rounded-xl border p-3 cursor-pointer transition-colors ${
               belowTarget
-                ? "bg-green-50 border-green-200"
-                : "bg-orange-50 border-orange-200"
+                ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
+                : "bg-orange-50 dark:bg-orange-900/30 border-orange-200 dark:border-orange-800"
             }`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   🎯 Target: <strong>${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</strong>
                 </p>
                 {pctDiff !== null && (
-                  <p className={`text-xs font-medium mt-0.5 ${belowTarget ? "text-green-700" : "text-orange-700"}`}>
+                  <p className={`text-xs font-medium mt-0.5 ${belowTarget ? "text-green-700 dark:text-green-400" : "text-orange-700 dark:text-orange-400"}`}>
                     {belowTarget
                       ? `✅ ${Math.abs(parseFloat(pctDiff)).toFixed(0)}% below your target!`
                       : `📈 ${parseFloat(pctDiff).toFixed(0)}% above your target`}
@@ -635,14 +635,14 @@ export default function ItemPage() {
       {item.stats && (
         <div className="grid grid-cols-3 gap-2">
           {[
-            { label: "Latest", value: `$${item.stats.latest?.toFixed(2) ?? "—"}`, sub: item.stats.latestStore, color: "text-brand-600" },
-            { label: "Average", value: `$${item.stats.avg.toFixed(2)}`, sub: `${item.priceEntries.length} entries`, color: "text-gray-900" },
-            { label: "Lowest ever", value: `$${item.stats.min.toFixed(2)}`, sub: canonicalUnit, color: "text-green-600" },
+            { label: "Latest", value: `$${item.stats.latest?.toFixed(2) ?? "—"}`, sub: item.stats.latestStore, color: "text-brand-600 dark:text-brand-500" },
+            { label: "Average", value: `$${item.stats.avg.toFixed(2)}`, sub: `${item.priceEntries.length} entries`, color: "text-gray-900 dark:text-gray-100" },
+            { label: "Lowest ever", value: `$${item.stats.min.toFixed(2)}`, sub: canonicalUnit, color: "text-green-600 dark:text-green-500" },
           ].map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
-              <p className="text-xs text-gray-500 mb-1">{s.label}</p>
+            <div key={s.label} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{s.label}</p>
               <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 truncate">{s.sub}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{s.sub}</p>
             </div>
           ))}
         </div>

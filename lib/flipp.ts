@@ -227,10 +227,11 @@ function keyWords(text: string): Set<string> {
       .toLowerCase()
       // Strip size/unit tokens: 454g, 2kg, 500mL, 12pk, 1.5lb, etc.
       .replace(/\d+(?:\.\d+)?\s*(?:kg|g|lb|lbs|L|mL|oz|pk|pack|ct|count)s?\b/gi, "")
-      // Split on whitespace and punctuation — but NOT on % so "3.2%" stays intact
-      .split(/[\s,/&()+]+/)
-      // Keep words 3+ chars, drop bare numbers, drop noise words
-      .filter((w) => w.length > 2 && !/^\d+$/.test(w) && !NOISE_WORDS.has(w))
+      // Split on whitespace and punctuation — but NOT on hyphens (preserve brand names like Coca-Cola)
+      // and NOT on % so "3.2%" stays intact
+      .split(/[\s,/()&]+/)
+      // Keep words 2+ chars (shorter threshold for brand names like "Oxi")
+      .filter((w) => w.length > 1 && !/^\d+$/.test(w) && !NOISE_WORDS.has(w))
   );
 }
 
@@ -287,11 +288,18 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   const union = trackedKw.size + flippKw.size - intersect;
   if (union === 0 || intersect / union < jaccardThreshold) return false;
 
-  // Stage 3 — tracked keywords must cover enough flyer keywords
-  // Lower threshold for 2-keyword items (compound flyer deals have many words)
-  const coverageThreshold = trackedKw.size <= 2 ? 0.28 : 0.5;
-  const coverage = intersect / flippKw.size;
-  return coverage >= coverageThreshold;
+  // Stage 3 — tracked keywords must cover enough of the flyer keywords.
+  // But more importantly, extra flyer keywords indicate a different product
+  // variant (e.g. "Chicken Breast Roast" ≠ "Chicken Breast").
+  // Use the tighter of two coverage ratios:
+  //   a) tracked→flyer (tracked keywords as % of flyer keywords)
+  //   b) flyer→tracked (flyer keywords as % of tracked keywords)
+  // Both must exceed threshold, so "Chicken Breast" (2) vs
+  // "Chicken Breast Roast" (4) fails: 2/4 = 0.50 < 0.55.
+  const coverageTrackedToFlyer = intersect / flippKw.size;
+  const coverageFlyerToTracked = intersect / trackedKw.size;
+  const coverageThreshold = trackedKw.size <= 2 ? 0.30 : 0.55;
+  return coverageTrackedToFlyer >= coverageThreshold && coverageFlyerToTracked >= 0.65;
 }
 
 /** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */

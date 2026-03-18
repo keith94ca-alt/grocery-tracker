@@ -249,14 +249,14 @@ function AddForm() {
   return (
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Add Price Entry</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add Price Entry</h2>
         {recentItems.length > 0 && (
-          <span className="text-xs text-gray-400">{recentItems.length} recent items</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{recentItems.length} recent items</span>
         )}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm animate-shake">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3 text-red-700 dark:text-red-400 text-sm animate-shake">
           ⚠️ {error}
         </div>
       )}
@@ -271,7 +271,7 @@ function AddForm() {
                 key={idx}
                 type="button"
                 onClick={() => selectItem(item)}
-                className="shrink-0 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-brand-300 hover:bg-brand-50 transition-colors active:scale-95"
+                className="shrink-0 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:border-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 transition-colors active:scale-95"
               >
                 {item.name}
               </button>
@@ -349,7 +349,7 @@ function AddForm() {
           className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
             packMode
               ? "bg-brand-600 text-white border-brand-600 shadow-sm"
-              : "bg-white text-gray-600 border-gray-300 hover:border-brand-300"
+              : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-300"
           }`}
         >
           📦 {packMode ? "Multi-pack ON" : "Multi-pack / Bundle"}
@@ -361,8 +361,8 @@ function AddForm() {
 
       {/* Multi-pack calculator */}
       {packMode && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
-          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Pack details</p>
+        <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Pack details</p>
 
           <div className="flex items-end gap-2">
             <div className="flex-none w-20">
@@ -446,10 +446,10 @@ function AddForm() {
 
       {/* Unit price preview */}
       {unitPrice !== null && (
-        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
-          <span className="text-green-600">=</span>
-          <strong className="text-green-800 text-lg">${unitPrice.toFixed(2)}</strong>
-          <span className="text-green-600">/{form.unit.replace("per ", "")}</span>
+        <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+          <span className="text-green-600 dark:text-green-400">=</span>
+          <strong className="text-green-800 dark:text-green-300 text-lg">${unitPrice.toFixed(2)}</strong>
+          <span className="text-green-600 dark:text-green-400">/{form.unit.replace("per ", "")}</span>
         </div>
       )}
 
@@ -492,7 +492,7 @@ function AddForm() {
               className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-colors ${
                 form.date === preset.date
                   ? "bg-brand-600 text-white border-brand-600"
-                  : "bg-white text-gray-600 border-gray-300 hover:border-brand-300"
+                  : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-300"
               }`}
             >
               {preset.label}
@@ -507,14 +507,14 @@ function AddForm() {
       {/* Price type */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">Price type</label>
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-700 rounded-xl">
           <button
             type="button"
             onClick={() => setForm((prev) => ({ ...prev, priceType: "normal" }))}
             className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
               form.priceType === "normal"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500"
+                ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
             🏪 Normal
@@ -524,8 +524,8 @@ function AddForm() {
             onClick={() => setForm((prev) => ({ ...prev, priceType: "sale" }))}
             className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
               form.priceType === "sale"
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500"
+                ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
             🏷️ On Sale
