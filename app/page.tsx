@@ -56,6 +56,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [trackedItems, setTrackedItems] = useState<{ id: number; name: string; targetPrice: number | null }[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -67,6 +68,14 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setDealsLoading(false));
+
+    // Load tracked items for price alerts
+    fetch("/api/items")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setTrackedItems(data);
+      })
+      .catch(() => {});
 
     // Load recent price entries
     fetch("/api/prices?limit=10")
@@ -205,7 +214,7 @@ export default function HomePage() {
         // Check if any deals beat target prices
         const alerts: { deal: DealResult; targetPrice: number }[] = [];
         for (const deal of activeDeals) {
-          const item = items.find(i => i.name.toLowerCase() === deal.itemName.toLowerCase());
+          const item = trackedItems.find(i => i.name.toLowerCase() === deal.itemName.toLowerCase());
           if (item?.targetPrice && deal.flyerUnitPrice && deal.flyerUnit) {
             // Compare normalized prices
             const targetNorm = item.targetPrice;
