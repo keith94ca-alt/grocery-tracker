@@ -24,10 +24,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { itemName, category, unit, price, quantity, store, date, notes, source, priceType } = body;
+    const { itemId, itemName, category, unit, price, quantity, store, date, notes, source, priceType } = body;
 
-    if (!itemName?.trim()) {
-      return NextResponse.json({ error: "Item name is required" }, { status: 400 });
+    // Support both itemId (when editing an existing item's price) and itemName (new entry)
+    if (!itemId && !itemName?.trim()) {
+      return NextResponse.json({ error: "Item name or ID is required" }, { status: 400 });
     }
     if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
       return NextResponse.json({ error: "Valid price is required" }, { status: 400 });
@@ -44,16 +45,24 @@ export async function POST(request: NextRequest) {
     const unitPrice = parsedPrice / parsedQty;
     const entryDate = date ? new Date(date) : new Date();
 
-    // Upsert item
-    const item = await prisma.item.upsert({
-      where: { name: itemName.trim() },
-      update: {},
-      create: {
-        name: itemName.trim(),
-        category: category || "Other",
-        unit: unit || "each",
-      },
-    });
+    // Find or create item
+    let item;
+    if (itemId) {
+      item = await prisma.item.findUnique({ where: { id: parseInt(itemId) } });
+      if (!item) {
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      }
+    } else {
+      item = await prisma.item.upsert({
+        where: { name: itemName.trim() },
+        update: {},
+        create: {
+          name: itemName.trim(),
+          category: category || "Other",
+          unit: unit || "each",
+        },
+      });
+    }
 
     // Upsert store
     await prisma.store.upsert({
