@@ -84,12 +84,6 @@
 
 ## Priority 4: Desktop Experience
 
-### Keyboard Shortcuts
-- `Ctrl+K` or `/` → focus search
-- `Ctrl+N` → add new price entry
-- `Esc` → close modals
-- Arrow keys for navigation in lists
-
 ### Data Density
 - Desktop could show more data per row (3-4 columns of items on home page)
 - Flyer page could show grid view on desktop instead of single column
@@ -146,8 +140,7 @@
 
 ## Quick Wins (easy to implement, high impact)
 
-1. **Keyboard shortcut: focus search** — Add `Ctrl+K` listener on home page
-2. **Remember last store** — Pre-fill store on Add page based on last entry
+1. **Remember last store** — Pre-fill store on Add page based on last entry
 3. **Copy item name to clipboard** — Long-press on item name
 4. **Dark mode** — Add dark mode toggle (most mobile users prefer dark)
 5. **Better date display** — "2 days ago" instead of "Mar 15" on recent entries
@@ -164,13 +157,13 @@
 1. Fix bugs (fuzzy matching, search, Coca-Cola)
 2. Pull-to-refresh + skeleton shimmer
 3. Desktop data density (grid layout on lg)
-4. Keyboard shortcuts
-5. Price alerts (target price comparison on load)
-6. Better search with suggestions
-7. Store trends improvements
-8. Unit normalization improvements (per dozen, bunch)
-9. Remember last store pre-fill
-10. Dark mode
+4. Price alerts (target price comparison on load)
+5. Better search with suggestions
+6. Store trends improvements
+7. Unit normalization improvements (per dozen, bunch)
+8. Remember last store pre-fill
+9. Dark mode
+10. Empty state improvements (helpful CTAs on blank pages)
 
 ---
 
