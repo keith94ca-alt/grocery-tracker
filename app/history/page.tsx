@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { HistoryEntrySkeleton } from "@/components/Skeletons";
-import { normalizePrice } from "@/lib/units";
 
 interface Entry {
   id: number;
@@ -258,8 +257,8 @@ export default function HistoryPage() {
                 </div>
                 <div className="text-right ml-3">
                   <p className="font-bold text-brand-600">
-                    ${normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).price.toFixed(2)}
-                    <span className="text-xs font-normal text-gray-500">/{normalizePrice(entry.unitPrice, entry.unit || entry.item.unit).unit}</span>
+                    ${entry.unitPrice.toFixed(2)}
+                    <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
                   </p>
                   {entry.quantity !== 1 && (
                     <p className="text-xs text-gray-400">${entry.price.toFixed(2)} total</p>
