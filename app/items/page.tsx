@@ -415,9 +415,17 @@ export default function ItemsPage() {
           <p className="font-medium text-gray-600">
             {search ? `No items matching "${search}"` : "No items yet"}
           </p>
+          {!search && (
+            <div className="mt-4 space-y-2">
+              <p className="text-sm text-gray-500">Start tracking grocery prices</p>
+              <Link href="/add" className="inline-block px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors">
+                Add Your First Price
+              </Link>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
           {/* Watchlist section */}
           {watched.length > 0 && (
             <div className="space-y-2">
