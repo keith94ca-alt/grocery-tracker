@@ -20,6 +20,7 @@ interface ManagedItem {
   watched: boolean;
   targetPrice: number | null;
   _count: { priceEntries: number };
+  lastPrice?: { unitPrice: number; store: string; date: string; unit: string } | null;
 }
 
 // ── Edit Modal ────────────────────────────────────────────────────────────────
@@ -307,10 +308,26 @@ export default function ItemsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/items");
+      // Use stats=true to get latest price info
+      const res = await fetch("/api/items?stats=true");
       const data = await res.json();
       if (Array.isArray(data)) {
-        setItems(data.sort((a: ManagedItem, b: ManagedItem) => a.name.localeCompare(b.name)));
+        const items: ManagedItem[] = data.map((d: { id: number; name: string; category: string; unit: string; watched: boolean; targetPrice: number | null; stats: { count: number; latest: number | null; latestStore: string | null; latestDate: string | null; canonicalUnit: string } | null }) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          unit: d.unit,
+          watched: d.watched,
+          targetPrice: d.targetPrice,
+          _count: { priceEntries: d.stats?.count ?? 0 },
+          lastPrice: d.stats?.latest ? {
+            unitPrice: d.stats.latest,
+            store: d.stats.latestStore ?? "",
+            date: d.stats.latestDate ?? "",
+            unit: d.stats.canonicalUnit,
+          } : null,
+        }));
+        setItems(items.sort((a, b) => a.name.localeCompare(b.name)));
       }
     } finally {
       setLoading(false);
@@ -510,9 +527,15 @@ function ItemRow({
       <Link href={`/item/${item.id}`} className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <span className="text-xs text-gray-500">
-            {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
-          </span>
+          {item.lastPrice ? (
+            <span className="text-xs text-brand-600 font-medium">
+              ${item.lastPrice.unitPrice.toFixed(2)}/{item.lastPrice.unit.replace("per ", "")} at {item.lastPrice.store}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-500">
+              {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
+            </span>
+          )}
           {item.targetPrice && (
             <span className="text-xs text-blue-600">🎯 ${item.targetPrice.toFixed(2)}</span>
           )}

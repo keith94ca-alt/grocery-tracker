@@ -102,12 +102,18 @@ function AddForm() {
   const [error, setError] = useState("");
   const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
 
-  // Load recent items from API (most recent price entries)
+  // Load recent items + last store from API
   useEffect(() => {
     fetch("/api/prices?limit=20")
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) return;
+
+        // Pre-fill store with last used store
+        if (data.length > 0 && !form.store) {
+          setForm((prev) => ({ ...prev, store: data[0].store }));
+        }
+
         const seen = new Set<string>();
         const items: { name: string; category: string; unit: string }[] = [];
         for (const entry of data) {

@@ -80,22 +80,27 @@ stores
 - PWA manifest — installable on phone
 
 ### Phase 2: Insights & Polish ✅ (Done)
-- Price trend charts
-- Dashboard (most-tracked items, recent entries, price drops)
-- Category browsing
+- Price trend charts (SVG sparkline with date labels)
+- Dashboard (recent activity, deals this week, quick actions)
+- Category browsing + filter
 - "Deal or No Deal" indicator (green/yellow/red)
-- Bulk entry / CSV import
+- Store comparison (cheapest store per item)
+- Target price tracking (set goals, compare against deals)
+- Normal vs sale price distinction
+- CSV export
 
 ### Phase 3: Automation ✅ (Done)
-- Flyer scraper — background job pulling weekly deals from Flipp
-- Receipt OCR
-- Price alerts
+- Flyer scraper — Flipp API integration for weekly deals
+- Smart flyer matching (two-stage keyword + Jaccard, compound deal support)
+- Dismiss bad flyer matches (persists in database)
+- Price alerts via target price comparison
 
-### Phase 4: Nice-to-Haves
-- Shopping list integration
-- Store comparison
-- Barcode scanning (Open Food Facts API)
-- Multi-user / household sharing
+### Phase 4: In Progress
+- Shopping list (database-backed, syncs across devices) ✅
+- Store comparison page (/stores) ✅
+- Basket comparison ("where should I shop?") — planned
+- Barcode scanning (Open Food Facts API) — planned
+- Multi-user / household sharing — planned (see USER_MANAGEMENT.md)
 
 ---
 

@@ -7,6 +7,25 @@
   --background-rgb: 249, 250, 251;
 }
 
+/* Dark mode via system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 229, 231, 235;
+    --background-rgb: 17, 24, 39;
+  }
+  .bg-white { background-color: #1f2937 !important; }
+  .border-gray-200 { border-color: #374151 !important; }
+  .border-gray-100 { border-color: #1f2937 !important; }
+  .text-gray-900 { color: #f3f4f6 !important; }
+  .text-gray-700 { color: #d1d5db !important; }
+  .text-gray-600 { color: #9ca3af !important; }
+  .text-gray-500 { color: #9ca3af !important; }
+  .text-gray-400 { color: #6b7280 !important; }
+  .bg-gray-50 { background-color: #111827 !important; }
+  .bg-gray-100 { background-color: #1f2937 !important; }
+  .border-gray-300 { border-color: #374151 !important; }
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));

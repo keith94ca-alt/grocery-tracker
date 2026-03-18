@@ -167,7 +167,7 @@ export default function HomePage() {
       <>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
         <Link href="/add"
           className="flex flex-col items-center gap-1 py-3 bg-brand-50 rounded-xl text-brand-700 hover:bg-brand-100 transition-colors">
           <span className="text-xl">➕</span>
