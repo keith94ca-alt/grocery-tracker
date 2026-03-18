@@ -665,14 +665,18 @@ export default function ItemPage() {
 
       {/* Store comparison */}
       {item.priceEntries.length >= 2 && (() => {
-        // Group by store, compute average unit price per store
+        // Group by store, compute average unit price per store (normalized to canonical unit)
         const storeMap = new Map<string, { total: number; count: number; best: number }>();
         item.priceEntries.forEach((entry) => {
+          const entryUnit = entry.unit || item.unit;
+          const normPrice = sameUnitGroup(entryUnit, canonicalUnit)
+            ? convertUnitPrice(entry.unitPrice, entryUnit, canonicalUnit) ?? entry.unitPrice
+            : entry.unitPrice;
           const store = entry.store || "Unknown";
           const existing = storeMap.get(store) || { total: 0, count: 0, best: Infinity };
-          existing.total += entry.unitPrice;
+          existing.total += normPrice;
           existing.count += 1;
-          existing.best = Math.min(existing.best, entry.unitPrice);
+          existing.best = Math.min(existing.best, normPrice);
           storeMap.set(store, existing);
         });
 

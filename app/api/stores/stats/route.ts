@@ -39,16 +39,18 @@ export async function GET() {
       s.entries.push(entry);
       s.items.add(entry.item.name);
       s.categories.add(entry.item.category);
-      s.prices.push(entry.unitPrice);
+      const pn = normalizePrice(entry.unitPrice, entry.unit);
+      s.prices.push(pn.price);
     }
 
     const results: StoreStat[] = Array.from(storeMap.entries())
       .map(([name, data]) => {
         const cheapestByItem = new Map<string, { price: number; unit: string }>();
         for (const entry of data.entries) {
+          const pn = normalizePrice(entry.unitPrice, entry.unit);
           const existing = cheapestByItem.get(entry.item.name);
-          if (!existing || entry.unitPrice < existing.price) {
-            cheapestByItem.set(entry.item.name, { price: entry.unitPrice, unit: entry.item.unit });
+          if (!existing || pn.price < existing.price) {
+            cheapestByItem.set(entry.item.name, { price: pn.price, unit: pn.unit });
           }
         }
 

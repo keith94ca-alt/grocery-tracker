@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { normalizePrice } from "@/lib/units";
 
 interface Item {
   id: number;
@@ -58,16 +59,17 @@ export default function ComparePage() {
         const res = await fetch(`/api/prices?itemId=${itemId}&limit=100`);
         const data = await res.json();
         if (Array.isArray(data)) {
-          // Get the cheapest price per store
+          // Get the cheapest price per store (normalized to canonical unit)
           const storePrices = new Map<string, StorePrice>();
           for (const entry of data) {
             if (entry.source !== "manual" && entry.source !== "receipt") continue;
+            const norm = normalizePrice(entry.unitPrice, entry.unit);
             const existing = storePrices.get(entry.store);
-            if (!existing || entry.unitPrice < existing.unitPrice) {
+            if (!existing || norm.price < normalizePrice(existing.unitPrice, existing.unit).price) {
               storePrices.set(entry.store, {
                 store: entry.store,
-                unitPrice: entry.unitPrice,
-                unit: entry.unit,
+                unitPrice: norm.price,
+                unit: norm.unit,
                 date: entry.date,
               });
             }
