@@ -13,6 +13,7 @@ const navItems = [
 
 const sideItems = [
   { href: "/stores", label: "Stores", icon: "🏪" },
+  { href: "/compare", label: "Compare", icon: "⚖️" },
   { href: "/history", label: "History", icon: "📋" },
 ];
 

@@ -11,7 +11,7 @@ const CATEGORIES = [
   "Household", "Personal Care", "Other",
 ];
 
-const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
+const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL", "per dozen", "per bunch"];
 
 const PACK_SIZE_UNITS = ["mL", "L", "g", "kg", "lb", "oz"];
 

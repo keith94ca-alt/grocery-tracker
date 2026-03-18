@@ -78,7 +78,11 @@ export default function HomePage() {
       .finally(() => setEntriesLoading(false));
   }, []);
 
-  // Search
+  // Search with recent searches
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("recent-searches") || "[]"); } catch { return []; }
+  });
+
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setSearchResults([]); return; }
     setSearchLoading(true);
@@ -86,6 +90,12 @@ export default function HomePage() {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (Array.isArray(data)) setSearchResults(data);
+      // Save to recent searches
+      setRecentSearches((prev) => {
+        const next = [q, ...prev.filter((s) => s !== q)].slice(0, 8);
+        try { localStorage.setItem("recent-searches", JSON.stringify(next)); } catch {}
+        return next;
+      });
     } catch {
       toast("Search failed", "error");
     } finally {
