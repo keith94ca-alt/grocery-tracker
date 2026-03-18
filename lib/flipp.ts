@@ -228,7 +228,7 @@ function keyWords(text: string): Set<string> {
       // Strip size/unit tokens: 454g, 2kg, 500mL, 12pk, 1.5lb, etc.
       .replace(/\d+(?:\.\d+)?\s*(?:kg|g|lb|lbs|L|mL|oz|pk|pack|ct|count)s?\b/gi, "")
       // Split on whitespace and punctuation — but NOT on % so "3.2%" stays intact
-      .split(/[\s,/&()\-+]+/)
+      .split(/[\s,/&()+]+/)
       // Keep words 3+ chars, drop bare numbers, drop noise words
       .filter((w) => w.length > 2 && !/^\d+$/.test(w) && !NOISE_WORDS.has(w))
   );
