@@ -157,7 +157,7 @@ export default function HomePage() {
                   className="block bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md hover:border-brand-200 transition-all active:scale-[0.98]">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{item.name}</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">{item.name}</h3>
                       <p className="text-xs text-gray-500 mt-0.5">
                         {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
                       </p>
@@ -246,7 +246,7 @@ export default function HomePage() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">🏷️ Deals This Week</h2>
-          <Link href="/flyer" className="text-xs text-brand-600 font-medium">Browse all →</Link>
+          <Link href="/flyer" className="text-xs text-brand-600 dark:text-brand-400 font-medium">Browse all →</Link>
         </div>
         {dealsLoading ? (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4">
@@ -316,7 +316,7 @@ export default function HomePage() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">📊 Recent Activity</h2>
-          <Link href="/history" className="text-xs text-brand-600 font-medium">All entries →</Link>
+          <Link href="/history" className="text-xs text-brand-600 dark:text-brand-400 font-medium">All entries →</Link>
         </div>
         {entriesLoading ? (
           <div className="space-y-2">
@@ -360,7 +360,7 @@ export default function HomePage() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">📦 Your Items</h2>
-          <Link href="/items" className="text-xs text-brand-600 font-medium">Manage →</Link>
+          <Link href="/items" className="text-xs text-brand-600 dark:text-brand-400 font-medium">Manage →</Link>
         </div>
         <Link href="/items"
           className="block text-center py-4 bg-white rounded-xl border border-gray-200 hover:shadow-sm transition-shadow text-sm text-gray-500 hover:text-brand-600">

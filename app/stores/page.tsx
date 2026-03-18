@@ -187,7 +187,7 @@ export default function StoresPage() {
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-semibold text-gray-900">{entry.item.name}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{entry.item.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{entry.item.category} · {formatDate(entry.date)}</p>
                 </div>
                 <p className="font-bold text-brand-600 text-right">

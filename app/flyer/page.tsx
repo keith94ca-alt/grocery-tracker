@@ -311,7 +311,7 @@ function AddModal({
                   ${computedUnitPrice.toFixed(2)} / kg
                 </span>
                 {unitMode === "per lb" && (
-                  <span className="text-gray-400"> (converted from /lb)</span>
+                  <span className="text-gray-400 dark:text-gray-500"> (converted from /lb)</span>
                 )}
               </p>
             </div>
@@ -432,7 +432,7 @@ function FlyerCard({
       <ImageLightbox src={lightboxImg} alt={flippItem.name} onClose={() => setLightboxImg(null)} />
     )}
     <div className={`bg-white rounded-xl border p-4 flex gap-3 items-start ${
-      added ? "border-green-200 opacity-60" : trackedMatch ? "border-brand-200" : "border-gray-200"
+      added ? "border-green-200 opacity-60" : trackedMatch ? "border-brand-200" : "border-gray-200 dark:border-gray-700"
     }`}>
       {flippItem.imageUrl && (
         <img

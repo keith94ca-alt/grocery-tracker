@@ -12,7 +12,7 @@ export default function FAB() {
   return (
     <Link
       href="/add"
-      className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-105 active:scale-95 lg:hidden"
+      className="fixed bottom-24 right-4 z-50 w-14 h-14 bg-brand-600 dark:bg-brand-700 hover:bg-brand-700 dark:hover:bg-brand-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-105 active:scale-95 lg:hidden"
       title="Add price"
     >
       +

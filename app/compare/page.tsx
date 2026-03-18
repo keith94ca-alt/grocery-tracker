@@ -184,13 +184,13 @@ export default function ComparePage() {
                 <div
                   key={store.store}
                   className={`bg-white rounded-xl border p-4 ${
-                    idx === 0 ? "border-green-300 bg-green-50" : "border-gray-200"
+                    idx === 0 ? "border-green-300 bg-green-50" : "border-gray-200 dark:border-gray-700"
                   }`}
                 >
                   <div className="flex justify-between items-center">
                     <div>
                       {idx === 0 && <span className="text-xs text-green-600 font-semibold">👑 CHEAPEST</span>}
-                      <p className="font-semibold text-gray-900">{store.store}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{store.store}</p>
                     </div>
                     <div className="text-right">
                       <p className={`text-lg font-bold ${idx === 0 ? "text-green-700" : "text-gray-700"}`}>

@@ -509,7 +509,7 @@ export default function ShoppingListPage() {
                       </button>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={`text-sm ${item.checked && !item.priceLogged ? "line-through text-gray-400" : "font-medium text-gray-900"}`}>
+                          <span className={`text-sm ${item.checked && !item.priceLogged ? "line-through text-gray-400" : "font-medium text-gray-900 dark:text-white"}`}>
                             {item.name}
                           </span>
                           {item.priceLogged && (

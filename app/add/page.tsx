@@ -536,7 +536,7 @@ function AddForm() {
       {/* Notes */}
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-gray-700">
-          Notes <span className="text-gray-400">(optional)</span>
+          Notes <span className="text-gray-400 dark:text-gray-500">(optional)</span>
         </label>
         <input type="text" value={form.notes}
           onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
