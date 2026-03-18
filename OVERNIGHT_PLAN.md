@@ -138,6 +138,15 @@
 
 ---
 
+## New Feature: Basket Comparison
+"Where should I shop this week?" — Given your shopping list + prices across stores, compute the cheapest store(s) for your basket.
+- Select items from your tracked list or shopping list
+- Compute total basket price per store
+- Show which store(s) save the most money
+- Factor in target prices and flyer deals
+- Could be a dedicated "Compare" page or overlay on the list page
+- Use the existing unit normalization for fair comparison
+
 ## Quick Wins (easy to implement, high impact)
 
 1. **Remember last store** — Pre-fill store on Add page based on last entry
@@ -165,6 +174,7 @@
 9. Remember last store pre-fill
 10. Dark mode
 11. Empty state improvements (helpful CTAs on blank pages)
+12. Basket comparison ("Where should I shop this week?")
 
 ---
 
