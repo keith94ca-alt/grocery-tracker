@@ -400,7 +400,7 @@ export default function HomePage() {
                 </div>
                 <span className="text-sm font-bold text-brand-600 dark:text-brand-500 shrink-0 ml-3">
                   ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-400">/{entry.item.unit.replace("per ", "")}</span>
+                  <span className="text-xs font-normal text-gray-400">/{entry.unit.replace("per ", "")}</span>
                 </span>
               </Link>
             ))}

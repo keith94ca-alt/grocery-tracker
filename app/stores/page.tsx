@@ -59,9 +59,9 @@ export default function StoresPage() {
         if (!existingBest || e.unitPrice < existingBest.unitPrice) {
           if (existingBest) {
             existingBest.unitPrice = e.unitPrice;
-            existingBest.unit = e.item.unit;
+            existingBest.unit = e.unit;
           } else {
-            existing.bestDeals.push({ name: e.item.name, unitPrice: e.unitPrice, unit: e.item.unit });
+            existing.bestDeals.push({ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit });
           }
         }
       } else {
@@ -70,7 +70,7 @@ export default function StoresPage() {
           itemCount: 1,
           totalEntries: 1,
           avgUnitPrice: e.unitPrice,
-          bestDeals: [{ name: e.item.name, unitPrice: e.unitPrice, unit: e.item.unit }],
+          bestDeals: [{ name: e.item.name, unitPrice: e.unitPrice, unit: e.unit }],
           categories: new Set([e.item.category]),
         });
       }
@@ -192,7 +192,7 @@ export default function StoresPage() {
                 </div>
                 <p className="font-bold text-brand-600 text-right">
                   ${entry.unitPrice.toFixed(2)}
-                  <span className="text-xs font-normal text-gray-500">/{entry.item.unit}</span>
+                  <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
                 </p>
               </div>
             </Link>

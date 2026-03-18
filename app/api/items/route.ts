@@ -86,7 +86,9 @@ export async function POST(request: NextRequest) {
       where: { name: name.trim() },
       update: {
         category: category || "Other",
-        unit: unit || "each",
+        // Don't overwrite unit on update — it's set at creation time
+        // Only update unit if explicitly provided (not defaulted)
+        ...(unit !== undefined && unit !== "each" ? { unit } : {}),
         // Only set watched=true if explicitly requested (never unwatch via upsert)
         ...(watched === true ? { watched: true } : {}),
       },

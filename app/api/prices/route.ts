@@ -52,6 +52,11 @@ export async function POST(request: NextRequest) {
       if (!item) {
         return NextResponse.json({ error: "Item not found" }, { status: 404 });
       }
+      // Update item's canonical unit if the new entry uses a different unit
+      if (unit && unit !== item.unit) {
+        await prisma.item.update({ where: { id: item.id }, data: { unit } });
+        item.unit = unit;
+      }
     } else {
       item = await prisma.item.upsert({
         where: { name: itemName.trim() },

@@ -226,7 +226,7 @@ export default function HistoryPage() {
                 <div className="text-right ml-3">
                   <p className="font-bold text-brand-600">
                     ${entry.unitPrice.toFixed(2)}
-                    <span className="text-xs font-normal text-gray-500">/{entry.item.unit}</span>
+                    <span className="text-xs font-normal text-gray-500">/{entry.unit}</span>
                   </p>
                   {entry.quantity !== 1 && (
                     <p className="text-xs text-gray-400">${entry.price.toFixed(2)} total</p>
