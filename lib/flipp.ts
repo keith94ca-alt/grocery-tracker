@@ -256,13 +256,20 @@ function fuzzyIntersect(a: Set<string>, b: Set<string>): number {
 /**
  * Returns true if `flippName` is a meaningful match for a tracked item named `trackedName`.
  *
+ * The core challenge: tracked items may be MORE specific ("Extra Lean Ground Beef")
+ * or LESS specific ("Bread") than flyer items. We need to handle both directions.
+ *
  * Three-stage check:
- *  1. ALL keywords from the tracked name must appear in the Flipp name.
- *  2. Bidirectional Jaccard similarity ≥ 0.35 prevents a short tracked name
- *     like "Chicken" from matching a very different product ("Chicken Burger Nuggets").
- *  3. Tracked keywords must cover ≥ 50% of flyer keywords — prevents "Chicken Breast"
- *     matching "Chicken Breast Roast" or "Chicken Breast Canned" where extra keywords
- *     indicate a different product variant.
+ *  1. At least one direction must have full keyword containment:
+ *     - tracked ⊆ flyer (tracked keywords all in flyer) — e.g. "Ground Beef" in "Extra Lean Ground Beef"
+ *     - flyer ⊆ tracked (flyer keywords all in tracked) — e.g. "Ground Beef" in "Ground Beef Boneless"
+ *     This prevents both false positives and false negatives.
+ *  2. Bidirectional Jaccard similarity ≥ threshold ensures the products are related,
+ *     preventing "Chicken" from matching "Chicken Burger Patties Frozen".
+ *  3. For multi-keyword tracked items where tracked ⊆ flyer, check that flyer doesn't
+ *     have too many EXTRA keywords (brand names, different product variants).
+ *     "Chicken Breast" (2) should NOT match "Maple Lodge Chicken Breast Roast" (5)
+ *     because 3 extra keywords indicate a different product.
  */
 export function matchesTrackedItem(flippName: string, trackedName: string): boolean {
   const flippKw = keyWords(flippName);
@@ -270,36 +277,62 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
 
   if (trackedKw.size === 0 || flippKw.size === 0) return false;
 
-  // Stage 1 — all tracked keywords must be present in the flipp name
-  const allPresent = [...trackedKw].every((tw) =>
+  // Stage 1 — at least one direction must have full keyword containment
+  // tracked ⊆ flyer: all tracked keywords appear in flyer (flyer is MORE specific)
+  //   e.g. "Ground Beef" ⊆ "Extra Lean Ground Beef 500g"
+  // flyer ⊆ tracked: all flyer keywords appear in tracked (tracked is MORE specific)
+  //   e.g. "Ground Beef" ⊆ "Extra Lean Ground Beef"
+  const trackedInFlyer = [...trackedKw].every((tw) =>
     [...flippKw].some((fw) => wordMatches(tw, fw))
   );
-  if (!allPresent) return false;
+  const flyerInTracked = [...flippKw].every((fw) =>
+    [...trackedKw].some((tw) => wordMatches(fw, tw))
+  );
 
-  // Single-keyword items: word match in Stage 1 is specific enough.
-  // Skip Jaccard + coverage checks (compound flyer deals inflate keyword count)
+  if (!trackedInFlyer && !flyerInTracked) return false;
+
+  // Single-keyword tracked items (e.g. "Bread", "Milk"): containment check is enough.
+  // Don't apply extra filters — user asked for a category, any product in it is relevant.
   if (trackedKw.size <= 1) return true;
 
-  // Stage 2 — bidirectional Jaccard similarity (multi-keyword items only)
-  // Lower threshold for 2-keyword items (e.g. "Pork Loin") since compound
-  // flyer items have many extra words that dilute the score
-  const jaccardThreshold = trackedKw.size <= 2 ? 0.25 : 0.35;
+  // Stage 2 — bidirectional Jaccard similarity
+  // Higher threshold for multi-keyword items to prevent loosely related matches
   const intersect = fuzzyIntersect(trackedKw, flippKw);
   const union = trackedKw.size + flippKw.size - intersect;
+  const jaccardThreshold = trackedKw.size <= 2 ? 0.25 : 0.35;
   if (union === 0 || intersect / union < jaccardThreshold) return false;
 
-  // Stage 3 — tracked keywords must cover enough of the flyer keywords.
-  // But more importantly, extra flyer keywords indicate a different product
-  // variant (e.g. "Chicken Breast Roast" ≠ "Chicken Breast").
-  // Use the tighter of two coverage ratios:
-  //   a) tracked→flyer (tracked keywords as % of flyer keywords)
-  //   b) flyer→tracked (flyer keywords as % of tracked keywords)
-  // Both must exceed threshold, so "Chicken Breast" (2) vs
-  // "Chicken Breast Roast" (4) fails: 2/4 = 0.50 < 0.55.
+  // Stage 3 — for tracked ⊆ flyer cases, prevent matching when flyer has too many
+  // extra keywords that indicate a different product or brand.
+  // "Chicken Breast" (2) vs "Maple Lodge Chicken Breast Roast" (5):
+  //   trackedInFlyer=true, flyerInTracked=false, coverageTrackedToFlyer=2/5=0.40 < 0.55 → NO MATCH ✓
+  // "Chicken Breast" (2) vs "Chicken Breast Boneless" (4):
+  //   trackedInFlyer=true, flyerInTracked=false, coverageTrackedToFlyer=2/4=0.50 < 0.55 → NO MATCH ✗
+  //   BUT this should match! Boneless is a descriptor, not a different product.
+  //
+  // Better heuristic: check if the extra flyer keywords are product descriptors
+  // (boneless, skinless, organic, fresh, etc.) or brand names / product types.
+  // We can't easily distinguish, so use a simpler rule:
+  // If tracked keywords cover ≥ 50% of flyer keywords → match
+  // If tracked keywords cover 30-50% of flyer keywords → only match if the extra
+  //   flyer keywords are likely descriptors (contain common food adjectives)
   const coverageTrackedToFlyer = intersect / flippKw.size;
-  const coverageFlyerToTracked = intersect / trackedKw.size;
-  const coverageThreshold = trackedKw.size <= 2 ? 0.30 : 0.55;
-  return coverageTrackedToFlyer >= coverageThreshold && coverageFlyerToTracked >= 0.65;
+  if (trackedInFlyer && !flyerInTracked && coverageTrackedToFlyer < 0.55) {
+    // Check if the extra flyer keywords look like product descriptors, not brands/variants
+    const extraFlyerKw = [...flippKw].filter(
+      (fw) => ![...trackedKw].some((tw) => wordMatches(tw, fw))
+    );
+    const descriptors = new Set([
+      "boneless", "skinless", "organic", "free", "range", "natural", "fresh",
+      "lean", "extra", "whole", "low", "fat", "reduced", "sodium", "salt",
+      "large", "jumbo", "thin", "thick", "premium", "grade", "fancy", "pure",
+      "wild", "farm", "grass", "fed", "prime", "choice", "select", "strip",
+    ]);
+    const allDescriptors = extraFlyerKw.every((kw) => descriptors.has(kw));
+    if (!allDescriptors) return false;
+  }
+
+  return true;
 }
 
 /** Core Flipp fetch — returns all matching merchant items, with or without a parseable unit price. */
