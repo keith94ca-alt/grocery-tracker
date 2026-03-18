@@ -102,12 +102,25 @@ function AddForm() {
   const [error, setError] = useState("");
   const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
 
-  // Load recent items from localStorage
+  // Load recent items from API (most recent price entries)
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("grocery-recent-items");
-      if (raw) setRecentItems(JSON.parse(raw));
-    } catch {}
+    fetch("/api/prices?limit=20")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const seen = new Set<string>();
+        const items: { name: string; category: string; unit: string }[] = [];
+        for (const entry of data) {
+          const name = entry.item?.name;
+          if (name && !seen.has(name.toLowerCase())) {
+            seen.add(name.toLowerCase());
+            items.push({ name, category: "Other", unit: entry.item?.unit || "each" });
+          }
+          if (items.length >= 10) break;
+        }
+        setRecentItems(items);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -168,11 +181,11 @@ function AddForm() {
   const packIncompatible = packMode && packSizeVal !== "" && packQtyComputed === null;
 
   function saveRecentItem(name: string, category: string, unit: string) {
-    try {
-      const updated = [{ name, category, unit }, ...recentItems.filter((i) => i.name !== name)].slice(0, 10);
-      setRecentItems(updated);
-      localStorage.setItem("grocery-recent-items", JSON.stringify(updated));
-    } catch {}
+    // Update local state (persists via API on next load)
+    setRecentItems((prev) => {
+      const updated = [{ name, category, unit }, ...prev.filter((i) => i.name !== name)].slice(0, 10);
+      return updated;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {

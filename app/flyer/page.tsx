@@ -491,24 +491,21 @@ function FlyerCard({
             </button>
             <button
               onClick={() => {
-                try {
-                  const raw = localStorage.getItem("grocery-shopping-list");
-                  const list: { id: string; name: string; checked: boolean; category: string; addedAt: number }[] = raw ? JSON.parse(raw) : [];
-                  const name = trackedMatch?.name ?? simplifyFlyerName(flippItem.name);
-                  if (!list.some((i) => i.name.toLowerCase() === name.toLowerCase() && !i.checked)) {
-                    list.unshift({
-                      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                      name,
-                      checked: false,
-                      category: trackedMatch?.category ?? "Other",
-                      addedAt: Date.now(),
-                    });
-                    localStorage.setItem("grocery-shopping-list", JSON.stringify(list));
-                    toast(`Added ${name} to list`, "success");
-                  } else {
-                    toast(`${name} is already on your list`, "info");
-                  }
-                } catch { /* ignore */ }
+                const name = trackedMatch?.name ?? simplifyFlyerName(flippItem.name);
+                fetch("/api/shopping-list", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name, category: trackedMatch?.category ?? "Other" }),
+                })
+                  .then((r) => r.json())
+                  .then((data) => {
+                    if (data.id && !data.checked) {
+                      toast(`Added ${name} to list`, "success");
+                    } else {
+                      toast(`${name} is already on your list`, "info");
+                    }
+                  })
+                  .catch(() => toast("Failed to add to list", "error"));
               }}
               className="px-2 py-1.5 rounded-lg text-xs bg-gray-100 hover:bg-brand-100 hover:text-brand-700 transition-colors active:scale-95"
               title="Add to shopping list"
@@ -535,17 +532,25 @@ export default function FlyerPage() {
   const { toast } = useToast();
   // Confirm dialog for dismiss
   const [confirmDismiss, setConfirmDismiss] = useState<{ trackedItemId: number; flippId: number; itemName: string; trackedName: string } | null>(null);
-  // Dismissed flyer items (per tracked item) — persists across sessions
-  const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(() => {
-    try {
-      const raw = localStorage.getItem("flyer-dismissed");
-      if (!raw) return new Map();
-      const parsed = JSON.parse(raw) as Record<string, number[]>;
-      return new Map(Object.entries(parsed).map(([k, v]) => [k, new Set(v)]));
-    } catch {
-      return new Map();
-    }
-  });
+  // Dismissed flyer items (per tracked item) — loaded from API
+  const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(new Map());
+
+  // Load dismissed matches from API
+  useEffect(() => {
+    fetch("/api/flyer-dismissed")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) return;
+        const map = new Map<string, Set<number>>();
+        data.forEach((d: { trackedItemId: number; flippId: number }) => {
+          const key = `${d.trackedItemId}`;
+          if (!map.has(key)) map.set(key, new Set());
+          map.get(key)!.add(d.flippId);
+        });
+        setDismissed(map);
+      })
+      .catch(() => {});
+  }, []);
 
   const [added, setAdded] = useState<Set<number>>(() => {
     try {
@@ -590,18 +595,19 @@ export default function FlyerPage() {
   });
 
   function handleDismiss(trackedItemId: number, flippId: number) {
+    // Persist to database
+    fetch("/api/flyer-dismissed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trackedItemId, flippId }),
+    }).catch(() => {});
+
     setDismissed((prev) => {
       const key = `${trackedItemId}`;
       const next = new Map(prev);
       const set = new Set(next.get(key) || []);
       set.add(flippId);
       next.set(key, set);
-      // Persist to localStorage
-      try {
-        const obj: Record<string, number[]> = {};
-        next.forEach((v, k) => { obj[k] = [...v]; });
-        localStorage.setItem("flyer-dismissed", JSON.stringify(obj));
-      } catch {}
       return next;
     });
     toast("Match dismissed for this flyer", "info");

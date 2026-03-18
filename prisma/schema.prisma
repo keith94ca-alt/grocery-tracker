@@ -77,3 +77,12 @@ model ShoppingListItem {
 
   item       Item?    @relation(fields: [itemId], references: [id])
 }
+
+model DismissedFlyerMatch {
+  id            Int      @id @default(autoincrement())
+  trackedItemId Int
+  flippId       Int
+  createdAt     DateTime @default(now())
+
+  @@unique([trackedItemId, flippId])
+}

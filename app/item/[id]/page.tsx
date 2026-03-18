@@ -390,20 +390,20 @@ export default function ItemPage() {
         <div className="flex gap-2">
           <button
             onClick={() => {
-              try {
-                const raw = localStorage.getItem("grocery-shopping-list");
-                const list: { id: string; name: string; checked: boolean; category: string; addedAt: number }[] = raw ? JSON.parse(raw) : [];
-                if (!list.some((i) => i.name.toLowerCase() === item.name.toLowerCase() && !i.checked)) {
-                  list.unshift({
-                    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                    name: item.name,
-                    checked: false,
-                    category: item.category,
-                    addedAt: Date.now(),
-                  });
-                  localStorage.setItem("grocery-shopping-list", JSON.stringify(list));
-                }
-              } catch { /* ignore */ }
+              fetch("/api/shopping-list", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: item.name, category: item.category }),
+              })
+                .then((r) => r.json())
+                .then((data) => {
+                  if (data.id && !data.checked) {
+                    toast(`Added ${item.name} to list`, "success");
+                  } else {
+                    toast(`${item.name} is already on your list`, "info");
+                  }
+                })
+                .catch(() => toast("Failed to add to list", "error"));
             }}
             className="px-3 py-1.5 bg-gray-100 hover:bg-brand-100 text-gray-700 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors"
             title="Add to shopping list"
