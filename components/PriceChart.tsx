@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { normalizePrice } from "@/lib/units";
 
 interface PricePoint {
   date: string;
   unitPrice: number;
+  unit: string;
   store: string;
 }
 
@@ -25,7 +27,14 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const prices = sorted.map((e) => e.unitPrice);
+    // Normalize all prices to canonical unit (per kg / per L)
+    const normalized = sorted.map((e) => ({
+      ...e,
+      unitPrice: normalizePrice(e.unitPrice, e.unit).price,
+      unit: normalizePrice(e.unitPrice, e.unit).unit,
+    }));
+
+    const prices = normalized.map((e) => e.unitPrice);
     const min = Math.min(...prices);
     const max = Math.max(...prices);
     const range = max - min || 1;
@@ -42,8 +51,8 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     const chartW = width - PADDING_X * 2;
     const chartH = height - paddingY - paddingBottom;
 
-    const points = sorted.map((entry, i) => {
-      const x = PADDING_X + (i / (sorted.length - 1)) * chartW;
+    const points = normalized.map((entry, i) => {
+      const x = PADDING_X + (i / (normalized.length - 1)) * chartW;
       const y = paddingY + (1 - (entry.unitPrice - paddedMin) / paddedRange) * chartH;
       return { x, y, entry };
     });
@@ -58,7 +67,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     const avgY = paddingY + (1 - (avg - paddedMin) / paddedRange) * chartH;
 
     // Date label positions
-    const dateIndices = pickDateIndices(sorted.length);
+    const dateIndices = pickDateIndices(normalized.length);
 
     return {
       points,
@@ -73,8 +82,10 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       max,
       paddedMin,
       paddedMax,
-      sorted,
+      normalized,
       dateIndices,
+      firstDate: sorted[0].date,
+      lastDate: sorted[sorted.length - 1].date,
     };
   }, [entries]);
 
@@ -86,7 +97,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     );
   }
 
-  const { points, pathD, areaD, width, height, paddingBottom, avgY, avg, min, max, sorted, dateIndices } = chartData;
+  const { points, pathD, areaD, width, height, paddingBottom, avgY, avg, min, max, normalized, dateIndices, firstDate, lastDate } = chartData;
 
   function formatDateShort(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
@@ -96,8 +107,8 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
     return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric", year: "2-digit" });
   }
 
-  const firstPrice = sorted[0].unitPrice;
-  const lastPrice = sorted[sorted.length - 1].unitPrice;
+  const firstPrice = normalized[0].unitPrice;
+  const lastPrice = normalized[normalized.length - 1].unitPrice;
   const trendUp = lastPrice > firstPrice;
   const trendPercent = ((lastPrice - firstPrice) / firstPrice * 100).toFixed(1);
 
@@ -110,7 +121,7 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
             {trendUp ? "📈" : "📉"} {trendUp ? "+" : ""}{trendPercent}%
           </span>
           <span className="text-xs text-gray-400">
-            {sorted.length} entries · {formatDateShort(sorted[0].date)} – {formatDateShort(sorted[sorted.length - 1].date)}
+            {normalized.length} entries · {formatDateShort(firstDate)} – {formatDateShort(lastDate)}
           </span>
         </div>
       </div>
@@ -197,15 +208,15 @@ export default function PriceChart({ entries }: { entries: PricePoint[] }) {
       <div className="flex justify-around text-center">
         <div>
           <p className="text-xs text-gray-400">Lowest</p>
-          <p className="text-sm font-bold text-green-600">${min.toFixed(2)}</p>
+          <p className="text-sm font-bold text-green-600">${min.toFixed(2)}/{(normalized[0]?.unit || "").replace("per ", "")}</p>
         </div>
         <div>
           <p className="text-xs text-gray-400">Average</p>
-          <p className="text-sm font-bold text-gray-700">${avg.toFixed(2)}</p>
+          <p className="text-sm font-bold text-gray-700">${avg.toFixed(2)}/{(normalized[0]?.unit || "").replace("per ", "")}</p>
         </div>
         <div>
           <p className="text-xs text-gray-400">Highest</p>
-          <p className="text-sm font-bold text-red-600">${max.toFixed(2)}</p>
+          <p className="text-sm font-bold text-red-600">${max.toFixed(2)}/{(normalized[0]?.unit || "").replace("per ", "")}</p>
         </div>
       </div>
     </div>
