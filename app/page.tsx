@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import Fuse from "fuse.js";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import { useToast } from "@/components/Toast";
 
@@ -136,9 +137,21 @@ export default function HomePage() {
     if (!q.trim()) { setSearchResults([]); return; }
     setSearchLoading(true);
     try {
+      // Fetch broader results from server
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
       const data = await res.json();
-      if (Array.isArray(data)) setSearchResults(data);
+      if (!Array.isArray(data)) { setSearchResults([]); return; }
+
+      // Use Fuse.js for fuzzy matching and ranking
+      const fuse = new Fuse(data, {
+        keys: ["name", "category"],
+        threshold: 0.4,
+        distance: 50,
+        includeScore: true,
+      });
+      const fuzzyResults = fuse.search(q).map((r) => r.item);
+      setSearchResults(fuzzyResults.length > 0 ? fuzzyResults : data);
+
       // Save to recent searches
       setRecentSearches((prev) => {
         const next = [q, ...prev.filter((s) => s !== q)].slice(0, 8);
@@ -204,6 +217,9 @@ export default function HomePage() {
           ) : (
             searchResults.map((item) => {
               const latest = item.priceEntries[0];
+              const matchingDeal = deals.find(
+                (d) => d.itemName.toLowerCase() === item.name.toLowerCase()
+              );
               return (
                 <Link key={item.id} href={`/item/${item.id}`}
                   className="block bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md hover:border-brand-200 transition-all active:scale-[0.98]">
@@ -227,6 +243,24 @@ export default function HomePage() {
                     <div className="flex gap-4 mt-2 text-xs text-gray-600 border-t border-gray-100 pt-2">
                       <span>Avg: <strong>${item.stats.avg.toFixed(2)}</strong></span>
                       <span>Low: <strong className="text-green-600">${item.stats.min.toFixed(2)}</strong></span>
+                    </div>
+                  )}
+                  {matchingDeal && (
+                    <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-xs text-green-700 font-medium">
+                        🏷️ ${matchingDeal.bestDeal.currentPrice.toFixed(2)}
+                        {matchingDeal.flyerUnitPrice && matchingDeal.flyerUnit
+                          ? ` ($${matchingDeal.flyerUnitPrice.toFixed(2)}/${matchingDeal.flyerUnit.replace("per ", "")})`
+                          : ""}
+                        {" "}{matchingDeal.bestDeal.merchantName}
+                      </span>
+                      {matchingDeal.savingsPercent && matchingDeal.savingsPercent > 0 ? (
+                        <span className="text-xs font-semibold text-green-600">↓{matchingDeal.savingsPercent}%</span>
+                      ) : matchingDeal.normalUnitPrice ? (
+                        <span className="text-xs text-gray-400">≈ normal</span>
+                      ) : (
+                        <span className="text-xs text-green-600 font-medium">On flyer</span>
+                      )}
                     </div>
                   )}
                 </Link>

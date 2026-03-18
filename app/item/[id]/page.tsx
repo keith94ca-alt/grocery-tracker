@@ -127,7 +127,6 @@ function AllDealsModal({ deals, onClose }: { deals: FlippItem[]; onClose: () => 
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 text-sm leading-snug">{d.name}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{d.merchantName}</p>
-                      {d.saleStory && <p className="text-xs text-orange-600 font-medium mt-0.5">{d.saleStory}</p>}
                       <div className="flex items-center gap-2 mt-1">
                         {validTo && (
                           <p className="text-xs text-gray-400">

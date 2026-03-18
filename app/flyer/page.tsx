@@ -726,7 +726,7 @@ export default function FlyerPage() {
           </p>
         </div>
       ) : (
-        <div className="space-y-2 pb-4">
+        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 pb-4">
           {displayed.map((item) => (
             <FlyerCard
               key={item.flippItem.id}

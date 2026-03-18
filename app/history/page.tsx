@@ -141,10 +141,42 @@ export default function HistoryPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Price History</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <a href="/api/export" className="text-xs text-brand-600 font-medium hover:underline">
             📥 CSV
           </a>
+          <a href="/api/export/json" className="text-xs text-brand-600 font-medium hover:underline">
+            📥 JSON
+          </a>
+          <label className="text-xs text-gray-500 font-medium cursor-pointer hover:text-brand-600">
+            📤 Import
+            <input type="file" accept=".csv,.json" className="hidden" onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = async () => {
+                const content = reader.result as string;
+                const isJson = file.name.endsWith(".json");
+                try {
+                  const res = await fetch("/api/import", {
+                    method: "POST",
+                    headers: { "Content-Type": isJson ? "application/json" : "text/csv" },
+                    body: content,
+                  });
+                  const result = await res.json();
+                  if (res.ok) {
+                    alert(`Imported ${result.imported} entries (${result.skipped} skipped)`);
+                    window.location.reload();
+                  } else {
+                    alert(`Import failed: ${result.error}`);
+                  }
+                } catch {
+                  alert("Import failed");
+                }
+              };
+              reader.readAsText(file);
+            }} />
+          </label>
           <span className="text-sm text-gray-500">{filtered.length} entries</span>
         </div>
       </div>
@@ -207,7 +239,7 @@ export default function HistoryPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0">
           {visible.map((entry) => (
             <Link
               key={entry.id}

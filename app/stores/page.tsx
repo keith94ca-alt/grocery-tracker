@@ -214,6 +214,32 @@ export default function StoresPage() {
         Tap a store to see what you&apos;ve bought there and your best deals.
       </p>
 
+      {/* Trends */}
+      {storeStats.length >= 2 && (() => {
+        const mostShopped = storeStats[0];
+        const cheapest = [...storeStats].sort((a, b) => a.avgUnitPrice - b.avgUnitPrice)[0];
+        const mostDiverse = [...storeStats].sort((a, b) => b.categories.size - a.categories.size)[0];
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-brand-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Most Shopped</p>
+              <p className="text-sm font-bold text-brand-700 dark:text-green-400 truncate">{mostShopped.name}</p>
+              <p className="text-xs text-gray-400">{mostShopped.totalEntries} entries</p>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Cheapest Avg</p>
+              <p className="text-sm font-bold text-green-700 dark:text-green-400 truncate">{cheapest.name}</p>
+              <p className="text-xs text-gray-400">${cheapest.avgUnitPrice.toFixed(2)} avg</p>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Most Diverse</p>
+              <p className="text-sm font-bold text-blue-700 dark:text-blue-400 truncate">{mostDiverse.name}</p>
+              <p className="text-xs text-gray-400">{mostDiverse.categories.size} categories</p>
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="space-y-3">
         {storeStats.map((store) => (
           <button
