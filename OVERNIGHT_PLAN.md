@@ -175,6 +175,7 @@
 10. Dark mode
 11. Empty state improvements (helpful CTAs on blank pages)
 12. Basket comparison ("Where should I shop this week?")
+13. Show last recorded price on items page item rows (store + date + price, visible without clicking in)
 
 ---
 
