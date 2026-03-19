@@ -525,41 +525,41 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {trackedDeal && !item.checked && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <button
-                              onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
-                              className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
-                              🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
-                              {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
-                                ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
-                                : ""}
-                              {" "}{trackedDeal.bestDeal.merchantName}
-                              {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
-                            </button>
-                            {trackedDeal.savingsPercent && (
-                              <span className="text-xs text-green-600">↓{trackedDeal.savingsPercent}%</span>
-                            )}
-                          </div>
-                        )}
-                        {!trackedDeal && untrackedDeal && !item.checked && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <button
-                              onClick={() => setFlyerModal({ itemName: item.name, deals: [untrackedDeal] })}
-                              className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
-                              🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
-                              {untrackedDeal.unitPrice && untrackedDeal.unit
-                                ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
-                                : ""}
-                              {" "}{untrackedDeal.merchantName}
-                            </button>
-                          </div>
-                        )}
-                        {!trackedDeal && !untrackedDeal && !item.checked && normalPrice && (
-                          <div className="flex items-center gap-2 mt-0.5">
+                        {!item.checked && normalPrice && (
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
                             <span className="text-xs text-gray-500">
-                              🏪 Normal ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} at {normalPrice.store}
+                              ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} · {normalPrice.store}
                             </span>
+                          </div>
+                        )}
+                        {!item.checked && (trackedDeal || untrackedDeal) && (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {trackedDeal ? (
+                              <button
+                                onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
+                                className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
+                                🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
+                                {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
+                                  ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
+                                  : ""}
+                                {" "}{trackedDeal.bestDeal.merchantName}
+                                {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
+                              </button>
+                            ) : untrackedDeal ? (
+                              <button
+                                onClick={() => setFlyerModal({ itemName: item.name, deals: [untrackedDeal] })}
+                                className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
+                                🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
+                                {untrackedDeal.unitPrice && untrackedDeal.unit
+                                  ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
+                                  : ""}
+                                {" "}{untrackedDeal.merchantName}
+                              </button>
+                            ) : null}
+                            {trackedDeal?.savingsPercent && (
+                              <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
+                            )}
                           </div>
                         )}
                       </div>

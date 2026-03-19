@@ -554,9 +554,12 @@ function ItemRow({
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {item.lastPrice ? (
-            <span className="text-xs text-brand-600 font-medium">
-              ${item.lastPrice.unitPrice.toFixed(2)}/{item.lastPrice.unit.replace("per ", "")} at {item.lastPrice.store}
-            </span>
+            <>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
+              <span className="text-xs text-brand-600 font-medium">
+                ${item.lastPrice.unitPrice.toFixed(2)}/{item.lastPrice.unit.replace("per ", "")} · {item.lastPrice.store}
+              </span>
+            </>
           ) : (
             <span className="text-xs text-gray-500">
               {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
