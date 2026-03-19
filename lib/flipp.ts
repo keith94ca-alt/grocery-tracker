@@ -207,9 +207,11 @@ export function simplifyFlyerName(name: string): string {
  * e.g. "Whole Milk" must NOT match "Skim Milk".
  */
 const NOISE_WORDS = new Set([
-  "the", "and", "with", "from", "for", "per", "new", "our",
+  "the", "and", "or", "with", "from", "for", "per", "new", "our",
   // Vague brand/marketing filler that never describes the product
   "brand", "store",
+  // Common brand name parts that don't help distinguish products
+  "gay", "lea",
 ]);
 
 /**
@@ -316,20 +318,27 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   // If tracked keywords cover ≥ 50% of flyer keywords → match
   // If tracked keywords cover 30-50% of flyer keywords → only match if the extra
   //   flyer keywords are likely descriptors (contain common food adjectives)
-  const coverageTrackedToFlyer = intersect / flippKw.size;
-  if (trackedInFlyer && !flyerInTracked && coverageTrackedToFlyer < 0.55) {
-    // Check if the extra flyer keywords look like product descriptors, not brands/variants
-    const extraFlyerKw = [...flippKw].filter(
-      (fw) => ![...trackedKw].some((tw) => wordMatches(tw, fw))
-    );
-    const descriptors = new Set([
-      "boneless", "skinless", "organic", "free", "range", "natural", "fresh",
-      "lean", "extra", "whole", "low", "fat", "reduced", "sodium", "salt",
-      "large", "jumbo", "thin", "thick", "premium", "grade", "fancy", "pure",
-      "wild", "farm", "grass", "fed", "prime", "choice", "select", "strip",
-    ]);
-    const allDescriptors = extraFlyerKw.every((kw) => descriptors.has(kw));
-    if (!allDescriptors) return false;
+  // For small tracked items (1-2 keywords like "Plain Yogurt", "Butter"), the user is
+  // intentionally tracking a broad category. Skip the extra-keyword check — brand names
+  // and dietary descriptors (halal, probiotic, etc.) in the flyer name are fine.
+  if (trackedKw.size >= 3) {
+    const coverageTrackedToFlyer = intersect / flippKw.size;
+    if (trackedInFlyer && !flyerInTracked && coverageTrackedToFlyer < 0.55) {
+      // Check if the extra flyer keywords look like product descriptors, not brands/variants
+      const extraFlyerKw = [...flippKw].filter(
+        (fw) => ![...trackedKw].some((tw) => wordMatches(tw, fw))
+      );
+      const descriptors = new Set([
+        "boneless", "skinless", "organic", "free", "range", "natural", "fresh",
+        "lean", "extra", "whole", "low", "fat", "reduced", "sodium", "salt",
+        "large", "jumbo", "thin", "thick", "premium", "grade", "fancy", "pure",
+        "wild", "farm", "grass", "fed", "prime", "choice", "select", "strip",
+        "halal", "kosher", "probiotic", "lactose", "unsalted", "salted",
+        "plain", "original", "classic", "traditional", "homestyle",
+      ]);
+      const allDescriptors = extraFlyerKw.every((kw) => descriptors.has(kw));
+      if (!allDescriptors) return false;
+    }
   }
 
   return true;

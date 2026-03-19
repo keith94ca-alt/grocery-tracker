@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { simplifyFlyerName } from "@/lib/flipp";
@@ -8,6 +8,7 @@ import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route"
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
 import { FlyerCardSkeleton } from "@/components/Skeletons";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -567,7 +568,7 @@ function FlyerPageContent() {
     }
   });
 
-  useEffect(() => {
+  const loadFlyerData = useCallback(() => {
     fetch("/api/flyer-items")
       .then((r) => r.json())
       .then((d) => { if (Array.isArray(d)) setItems(d); })
@@ -581,13 +582,18 @@ function FlyerPageContent() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => { loadFlyerData(); }, [loadFlyerData]);
+  useRefreshOnFocus(loadFlyerData);
+
   const stores = useMemo(() => {
     const s = new Set(items.map((i) => i.flippItem.merchantName));
     return ["All", ...Array.from(s).sort()];
   }, [items]);
 
   const newItems = items.filter((i) => !i.trackedMatch);
-  const trackedItems = items.filter((i) => i.trackedMatch);
+  // "On Your List" = matched to a tracked item BUT no unit price detected — needs human intervention
+  const trackedItems = items.filter((i) => i.trackedMatch && !i.flippItem.unitPrice);
+  const uniqueTrackedCount = new Set(trackedItems.map((i) => i.trackedMatch!.id)).size;
 
   // Deals tab: only show deals where flyer price is cheaper than normal
   const cheaperDeals = deals.filter((d) => d.isCheaper);
@@ -726,7 +732,7 @@ function FlyerPageContent() {
               : "border-transparent text-gray-500"
           }`}
         >
-          On Your List {!loading && `(${trackedItems.length})`}
+          On Your List {!loading && `(${uniqueTrackedCount})`}
         </button>
         <button
           onClick={() => setTab("deals")}

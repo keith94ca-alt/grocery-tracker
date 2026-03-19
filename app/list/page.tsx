@@ -6,6 +6,8 @@ import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
 
 interface ShoppingListItem {
   id: string;
@@ -45,11 +47,12 @@ export default function ShoppingListPage() {
   const [suggestions, setSuggestions] = useState<{ id: number; name: string; category: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
-  const [untrackedFlyerDeals, setUntrackedFlyerDeals] = useState<Map<string, FlyerMatch>>(new Map());
+  const [untrackedFlyerDeals, setUntrackedFlyerDeals] = useState<Map<string, FlyerMatch[]>>(new Map());
   const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "clearChecked" | "clearAll" | "removeItem"; itemId?: string; itemName?: string } | null>(null);
+  const [flyerModal, setFlyerModal] = useState<{ itemName: string; deals: FlyerDealEntry[] } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -75,17 +78,23 @@ export default function ShoppingListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Load flyer deals and normal prices
-  useEffect(() => {
+  const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data: DealResult[]) => {
         if (!Array.isArray(data)) return;
         const map = new Map<string, DealResult>();
-        data.forEach((d) => { if (d.isCheaper) map.set(d.itemName.toLowerCase(), d); });
+        data.forEach((d: DealResult) => { map.set(d.itemName.toLowerCase(), d); });
         setFlyerDeals(map);
       })
       .catch(() => {});
+  }, []);
+
+  useRefreshOnFocus(loadFlyerDeals);
+
+  // Load flyer deals and normal prices
+  useEffect(() => {
+    loadFlyerDeals();
 
     fetch("/api/items")
       .then((r) => r.json())
@@ -112,13 +121,13 @@ export default function ShoppingListPage() {
     if (toCheck.length === 0) return;
     let cancelled = false;
     async function checkUntracked() {
-      const results = new Map<string, FlyerMatch>();
+      const results = new Map<string, FlyerMatch[]>();
       for (const item of toCheck.slice(0, 20)) {
         try {
           const res = await fetch(`/api/flyer-match?name=${encodeURIComponent(item.name)}`);
           const data: FlyerMatch[] = await res.json();
           if (Array.isArray(data) && data.length > 0 && !cancelled) {
-            results.set(item.name.toLowerCase(), data[0]);
+            results.set(item.name.toLowerCase(), data);
           }
         } catch {}
       }
@@ -322,8 +331,8 @@ export default function ShoppingListPage() {
     return undefined;
   }
 
-  function findUntrackedFlyerDeal(itemName: string): FlyerMatch | undefined {
-    return untrackedFlyerDeals.get(itemName.toLowerCase());
+  function findUntrackedFlyerDeals(itemName: string): FlyerMatch[] {
+    return untrackedFlyerDeals.get(itemName.toLowerCase()) ?? [];
   }
 
   function findNormalPrice(itemName: string): { price: number; unit: string; store: string } | undefined {
@@ -486,8 +495,9 @@ export default function ShoppingListPage() {
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">{category}</h3>
               {catItems.map((item) => {
                 const trackedDeal = !item.checked ? findFlyerDeal(item.name) : undefined;
-                const untrackedDeal = !item.checked && !trackedDeal ? findUntrackedFlyerDeal(item.name) : undefined;
-                const normalPrice = !item.checked && !trackedDeal && !untrackedDeal ? findNormalPrice(item.name) : undefined;
+                const untrackedDeals = !item.checked && !trackedDeal ? findUntrackedFlyerDeals(item.name) : [];
+                const untrackedDeal = untrackedDeals[0];
+                const normalPrice = !item.checked ? findNormalPrice(item.name) : undefined;
                 const form = priceForms.get(item.id);
                 const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
                   ? (parseFloat(form.price) / parseFloat(form.quantity || "1")).toFixed(2)
@@ -516,38 +526,56 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {trackedDeal && !item.checked && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 font-medium">
-                              🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
-                              {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
-                                ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
-                                : ""}
-                              {" "}{trackedDeal.bestDeal.merchantName}
-                            </span>
-                            {trackedDeal.savingsPercent && (
-                              <span className="text-xs text-green-600">↓{trackedDeal.savingsPercent}%</span>
+                        {!item.checked && (trackedDeal || untrackedDeal || normalPrice) && (() => {
+                          const flyerUnitPrice = trackedDeal?.flyerUnitPrice ?? untrackedDeal?.unitPrice ?? null;
+                          const flyerCheaper = normalPrice && flyerUnitPrice !== null
+                            ? flyerUnitPrice < normalPrice.price
+                            : null; // null = no comparison possible
+                          const normalColor = flyerCheaper === null ? "text-gray-500" : flyerCheaper ? "text-gray-400" : "text-green-700";
+                          const flyerColor  = flyerCheaper === null ? "text-green-700" : flyerCheaper ? "text-green-700" : "text-gray-400";
+                          return (
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            {normalPrice && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-xs font-medium text-gray-500">🏪 Normal</span>
+                                <span className={`text-xs font-medium ${normalColor}`}>
+                                  ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} · {normalPrice.store}
+                                </span>
+                              </div>
+                            )}
+                            {(trackedDeal || untrackedDeal) && (
+                              <div className="flex items-center gap-2">
+                                {trackedDeal ? (
+                                  <button
+                                    onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
+                                    className={`text-xs font-medium hover:underline active:opacity-70 text-left ${flyerColor}`}>
+                                    🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
+                                    {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
+                                      ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
+                                      : ""}
+                                    {" "}{trackedDeal.bestDeal.merchantName}
+                                    {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
+                                  </button>
+                                ) : untrackedDeal ? (
+                                  <button
+                                    onClick={() => setFlyerModal({ itemName: item.name, deals: untrackedDeals })}
+                                    className={`text-xs font-medium hover:underline active:opacity-70 text-left ${flyerColor}`}>
+                                    🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
+                                    {untrackedDeal.unitPrice && untrackedDeal.unit
+                                      ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
+                                      : ""}
+                                    {" "}{untrackedDeal.merchantName}
+                                    {untrackedDeals.length > 1 && <span className="text-gray-400 ml-1">+{untrackedDeals.length - 1} more</span>}
+                                  </button>
+                                ) : null}
+                                {trackedDeal?.savingsPercent && (
+                                  <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                        {!trackedDeal && untrackedDeal && !item.checked && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 font-medium">
-                              🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
-                              {untrackedDeal.unitPrice && untrackedDeal.unit
-                                ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
-                                : ""}
-                              {" "}{untrackedDeal.merchantName}
-                            </span>
-                          </div>
-                        )}
-                        {!trackedDeal && !untrackedDeal && !item.checked && normalPrice && (
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-gray-500">
-                              🏪 Normal ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} at {normalPrice.store}
-                            </span>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {item.checked && !item.priceLogged && (
@@ -685,6 +713,10 @@ export default function ShoppingListPage() {
           }}
           onCancel={() => setConfirmAction(null)}
         />
+      )}
+
+      {flyerModal && (
+        <FlyerDealsModal itemName={flyerModal.itemName} deals={flyerModal.deals} onClose={() => setFlyerModal(null)} />
       )}
     </div>
   );

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
+import type { DealResult } from "@/app/api/flyer-deals/route";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -302,7 +305,8 @@ export default function ItemsPage() {
   const [deleteItem, setDeleteItem] = useState<ManagedItem | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showWatchModal, setShowWatchModal] = useState(false);
-  const [flyerDeals, setFlyerDeals] = useState<Map<string, { price: number; store: string }>>(new Map());
+  const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
+  const [flyerModal, setFlyerModal] = useState<{ itemName: string; deals: FlyerDealEntry[] } | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -336,21 +340,27 @@ export default function ItemsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load flyer deals for watched items
-  useEffect(() => {
-    if (loading) return;
+  const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) return;
-        const map = new Map<string, { price: number; store: string }>();
-        data.forEach((d: { itemName: string; bestDeal: { currentPrice: number; merchantName: string } }) => {
-          map.set(d.itemName.toLowerCase(), { price: d.bestDeal.currentPrice, store: d.bestDeal.merchantName });
+        const map = new Map<string, DealResult>();
+        data.forEach((d: DealResult) => {
+          map.set(d.itemName.toLowerCase(), d);
         });
         setFlyerDeals(map);
       })
       .catch(() => {});
-  }, [loading]);
+  }, []);
+
+  // Load flyer deals after items are loaded, and on focus return
+  useEffect(() => {
+    if (!loading) loadFlyerDeals();
+  }, [loading, loadFlyerDeals]);
+
+  const refreshAll = useCallback(() => { load(); loadFlyerDeals(); }, [load, loadFlyerDeals]);
+  useRefreshOnFocus(refreshAll);
 
   async function toggleWatched(item: ManagedItem) {
     setTogglingId(item.id);
@@ -441,6 +451,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
+                  onFlyerClick={(deal) => setFlyerModal({ itemName: item.name, deals: deal.allDeals })}
                 />
               ))}
             </div>
@@ -463,6 +474,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
+                  onFlyerClick={(deal) => setFlyerModal({ itemName: item.name, deals: deal.allDeals })}
                 />
               ))}
             </div>
@@ -502,6 +514,10 @@ export default function ItemsPage() {
           }}
         />
       )}
+
+      {flyerModal && (
+        <FlyerDealsModal itemName={flyerModal.itemName} deals={flyerModal.deals} onClose={() => setFlyerModal(null)} />
+      )}
     </div>
   );
 }
@@ -514,13 +530,15 @@ function ItemRow({
   onEdit,
   onDelete,
   onToggleWatch,
+  onFlyerClick,
 }: {
   item: ManagedItem;
   toggling: boolean;
-  flyerDeal?: { price: number; store: string };
+  flyerDeal?: DealResult;
   onEdit: () => void;
   onDelete: () => void;
   onToggleWatch: () => void;
+  onFlyerClick: (deal: DealResult) => void;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm flex items-center gap-3">
@@ -535,22 +553,48 @@ function ItemRow({
       <Link href={`/item/${item.id}`} className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {item.lastPrice ? (
-            <span className="text-xs text-brand-600 font-medium">
-              ${item.lastPrice.unitPrice.toFixed(2)}/{item.lastPrice.unit.replace("per ", "")} at {item.lastPrice.store}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-500">
-              {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
-            </span>
+          {item.lastPrice ? (() => {
+            // Use flyerDeal.normalUnitPrice (cheapest recorded) for comparison if available,
+            // otherwise fall back to lastPrice (most recent entry)
+            const normalUnitPrice = flyerDeal?.normalUnitPrice ?? item.lastPrice!.unitPrice;
+            const flyerCheaper = flyerDeal?.flyerUnitPrice != null
+              ? flyerDeal.flyerUnitPrice < normalUnitPrice
+              : null;
+            const normalColor = flyerCheaper === null ? "text-brand-600" : flyerCheaper ? "text-gray-400" : "text-green-700";
+            const flyerColor  = flyerCheaper === null ? "text-green-600" : flyerCheaper ? "text-green-700" : "text-gray-400";
+            return (
+              <>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
+                <span className={`text-xs font-medium ${normalColor}`}>
+                  ${normalUnitPrice.toFixed(2)}/{item.lastPrice!.unit.replace("per ", "")} · {item.lastPrice!.store}
+                </span>
+                {flyerDeal && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
+                    className={`text-xs font-medium hover:underline active:opacity-70 ${flyerColor}`}>
+                    🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                    {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
+                  </button>
+                )}
+              </>
+            );
+          })() : (
+            <>
+              <span className="text-xs text-gray-500">
+                {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
+              </span>
+              {flyerDeal && (
+                <button
+                  onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
+                  className="text-xs text-green-600 font-medium hover:underline active:opacity-70">
+                  🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                  {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
+                </button>
+              )}
+            </>
           )}
           {item.targetPrice && (
             <span className="text-xs text-blue-600">🎯 ${item.targetPrice.toFixed(2)}</span>
-          )}
-          {flyerDeal && (
-            <span className="text-xs text-green-600 font-medium">
-              🏷️ ${flyerDeal.price.toFixed(2)} at {flyerDeal.store}
-            </span>
           )}
         </div>
       </Link>
