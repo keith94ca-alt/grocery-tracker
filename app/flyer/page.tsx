@@ -592,6 +592,7 @@ function FlyerPageContent() {
 
   const newItems = items.filter((i) => !i.trackedMatch);
   const trackedItems = items.filter((i) => i.trackedMatch);
+  const uniqueTrackedCount = new Set(trackedItems.map((i) => i.trackedMatch!.id)).size;
 
   // Deals tab: only show deals where flyer price is cheaper than normal
   const cheaperDeals = deals.filter((d) => d.isCheaper);
@@ -730,7 +731,7 @@ function FlyerPageContent() {
               : "border-transparent text-gray-500"
           }`}
         >
-          On Your List {!loading && `(${trackedItems.length})`}
+          On Your List {!loading && `(${uniqueTrackedCount})`}
         </button>
         <button
           onClick={() => setTab("deals")}
