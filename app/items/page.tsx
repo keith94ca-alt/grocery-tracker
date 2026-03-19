@@ -553,28 +553,45 @@ function ItemRow({
       <Link href={`/item/${item.id}`} className="flex-1 min-w-0">
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          {item.lastPrice ? (
+          {item.lastPrice ? (() => {
+            const flyerCheaper = flyerDeal?.flyerUnitPrice != null
+              ? flyerDeal.flyerUnitPrice < item.lastPrice!.unitPrice
+              : null;
+            const normalColor = flyerCheaper === null ? "text-brand-600" : flyerCheaper ? "text-gray-400" : "text-green-700";
+            const flyerColor  = flyerCheaper === null ? "text-green-600" : flyerCheaper ? "text-green-700" : "text-gray-400";
+            return (
+              <>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
+                <span className={`text-xs font-medium ${normalColor}`}>
+                  ${item.lastPrice!.unitPrice.toFixed(2)}/{item.lastPrice!.unit.replace("per ", "")} · {item.lastPrice!.store}
+                </span>
+                {flyerDeal && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
+                    className={`text-xs font-medium hover:underline active:opacity-70 ${flyerColor}`}>
+                    🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                    {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
+                  </button>
+                )}
+              </>
+            );
+          })() : (
             <>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
-              <span className="text-xs text-brand-600 font-medium">
-                ${item.lastPrice.unitPrice.toFixed(2)}/{item.lastPrice.unit.replace("per ", "")} · {item.lastPrice.store}
+              <span className="text-xs text-gray-500">
+                {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
               </span>
+              {flyerDeal && (
+                <button
+                  onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
+                  className="text-xs text-green-600 font-medium hover:underline active:opacity-70">
+                  🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                  {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
+                </button>
+              )}
             </>
-          ) : (
-            <span className="text-xs text-gray-500">
-              {item.category} · {item._count.priceEntries} {item._count.priceEntries === 1 ? "entry" : "entries"}
-            </span>
           )}
           {item.targetPrice && (
             <span className="text-xs text-blue-600">🎯 ${item.targetPrice.toFixed(2)}</span>
-          )}
-          {flyerDeal && (
-            <button
-              onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
-              className="text-xs text-green-600 font-medium hover:underline active:opacity-70">
-              🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
-              {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
-            </button>
           )}
         </div>
       </Link>

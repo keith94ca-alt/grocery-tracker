@@ -526,48 +526,56 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {!item.checked && (trackedDeal || untrackedDeal || normalPrice) && (
+                        {!item.checked && (trackedDeal || untrackedDeal || normalPrice) && (() => {
+                          const flyerUnitPrice = trackedDeal?.flyerUnitPrice ?? untrackedDeal?.unitPrice ?? null;
+                          const flyerCheaper = normalPrice && flyerUnitPrice !== null
+                            ? flyerUnitPrice < normalPrice.price
+                            : null; // null = no comparison possible
+                          const normalColor = flyerCheaper === null ? "text-gray-500" : flyerCheaper ? "text-gray-400" : "text-green-700";
+                          const flyerColor  = flyerCheaper === null ? "text-green-700" : flyerCheaper ? "text-green-700" : "text-gray-400";
+                          return (
                           <div className="flex flex-col gap-0.5 mt-0.5">
                             {normalPrice && (
                               <div className="flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
-                                <span className="text-xs text-gray-500">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-xs font-medium text-gray-500">🏪 Normal</span>
+                                <span className={`text-xs font-medium ${normalColor}`}>
                                   ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} · {normalPrice.store}
                                 </span>
                               </div>
                             )}
                             {(trackedDeal || untrackedDeal) && (
-                          <div className="flex items-center gap-2">
-                            {trackedDeal ? (
-                              <button
-                                onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
-                                className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
-                                🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
-                                {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
-                                  ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
-                                  : ""}
-                                {" "}{trackedDeal.bestDeal.merchantName}
-                                {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
-                              </button>
-                            ) : untrackedDeal ? (
-                              <button
-                                onClick={() => setFlyerModal({ itemName: item.name, deals: untrackedDeals })}
-                                className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
-                                🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
-                                {untrackedDeal.unitPrice && untrackedDeal.unit
-                                  ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
-                                  : ""}
-                                {" "}{untrackedDeal.merchantName}
-                                {untrackedDeals.length > 1 && <span className="text-gray-400 ml-1">+{untrackedDeals.length - 1} more</span>}
-                              </button>
-                            ) : null}
-                            {trackedDeal?.savingsPercent && (
-                              <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
+                              <div className="flex items-center gap-2">
+                                {trackedDeal ? (
+                                  <button
+                                    onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
+                                    className={`text-xs font-medium hover:underline active:opacity-70 text-left ${flyerColor}`}>
+                                    🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
+                                    {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
+                                      ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
+                                      : ""}
+                                    {" "}{trackedDeal.bestDeal.merchantName}
+                                    {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
+                                  </button>
+                                ) : untrackedDeal ? (
+                                  <button
+                                    onClick={() => setFlyerModal({ itemName: item.name, deals: untrackedDeals })}
+                                    className={`text-xs font-medium hover:underline active:opacity-70 text-left ${flyerColor}`}>
+                                    🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
+                                    {untrackedDeal.unitPrice && untrackedDeal.unit
+                                      ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
+                                      : ""}
+                                    {" "}{untrackedDeal.merchantName}
+                                    {untrackedDeals.length > 1 && <span className="text-gray-400 ml-1">+{untrackedDeals.length - 1} more</span>}
+                                  </button>
+                                ) : null}
+                                {trackedDeal?.savingsPercent && (
+                                  <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
+                                )}
+                              </div>
                             )}
                           </div>
-                            )}
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {item.checked && !item.priceLogged && (
