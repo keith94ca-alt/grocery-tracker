@@ -591,7 +591,8 @@ function FlyerPageContent() {
   }, [items]);
 
   const newItems = items.filter((i) => !i.trackedMatch);
-  const trackedItems = items.filter((i) => i.trackedMatch);
+  // "On Your List" = matched to a tracked item BUT no unit price detected — needs human intervention
+  const trackedItems = items.filter((i) => i.trackedMatch && !i.flippItem.unitPrice);
   const uniqueTrackedCount = new Set(trackedItems.map((i) => i.trackedMatch!.id)).size;
 
   // Deals tab: only show deals where flyer price is cheaper than normal
