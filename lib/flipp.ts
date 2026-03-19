@@ -207,9 +207,11 @@ export function simplifyFlyerName(name: string): string {
  * e.g. "Whole Milk" must NOT match "Skim Milk".
  */
 const NOISE_WORDS = new Set([
-  "the", "and", "with", "from", "for", "per", "new", "our",
+  "the", "and", "or", "with", "from", "for", "per", "new", "our",
   // Vague brand/marketing filler that never describes the product
   "brand", "store",
+  // Common brand name parts that don't help distinguish products
+  "gay", "lea",
 ]);
 
 /**
