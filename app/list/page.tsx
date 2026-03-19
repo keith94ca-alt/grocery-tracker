@@ -7,6 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
 import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
+import FlyerDealsModal from "@/components/FlyerDealsModal";
 
 interface ShoppingListItem {
   id: string;
@@ -51,6 +52,7 @@ export default function ShoppingListPage() {
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "clearChecked" | "clearAll" | "removeItem"; itemId?: string; itemName?: string } | null>(null);
+  const [flyerModal, setFlyerModal] = useState<DealResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -525,13 +527,16 @@ export default function ShoppingListPage() {
                         </div>
                         {trackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 font-medium">
+                            <button
+                              onClick={() => setFlyerModal(trackedDeal)}
+                              className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
                               🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
                               {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
                                 ? ` ($${trackedDeal.flyerUnitPrice.toFixed(2)}/${trackedDeal.flyerUnit.replace("per ", "")})`
                                 : ""}
                               {" "}{trackedDeal.bestDeal.merchantName}
-                            </span>
+                              {trackedDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{trackedDeal.allDeals.length - 1} more</span>}
+                            </button>
                             {trackedDeal.savingsPercent && (
                               <span className="text-xs text-green-600">↓{trackedDeal.savingsPercent}%</span>
                             )}
@@ -692,6 +697,10 @@ export default function ShoppingListPage() {
           }}
           onCancel={() => setConfirmAction(null)}
         />
+      )}
+
+      {flyerModal && (
+        <FlyerDealsModal deal={flyerModal} onClose={() => setFlyerModal(null)} />
       )}
     </div>
   );

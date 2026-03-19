@@ -6,6 +6,8 @@ import { ItemCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
+import FlyerDealsModal from "@/components/FlyerDealsModal";
+import type { DealResult } from "@/app/api/flyer-deals/route";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -303,7 +305,8 @@ export default function ItemsPage() {
   const [deleteItem, setDeleteItem] = useState<ManagedItem | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showWatchModal, setShowWatchModal] = useState(false);
-  const [flyerDeals, setFlyerDeals] = useState<Map<string, { price: number; store: string }>>(new Map());
+  const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
+  const [flyerModal, setFlyerModal] = useState<DealResult | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -342,9 +345,9 @@ export default function ItemsPage() {
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) return;
-        const map = new Map<string, { price: number; store: string }>();
-        data.forEach((d: { itemName: string; bestDeal: { currentPrice: number; merchantName: string } }) => {
-          map.set(d.itemName.toLowerCase(), { price: d.bestDeal.currentPrice, store: d.bestDeal.merchantName });
+        const map = new Map<string, DealResult>();
+        data.forEach((d: DealResult) => {
+          map.set(d.itemName.toLowerCase(), d);
         });
         setFlyerDeals(map);
       })
@@ -448,6 +451,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
+                  onFlyerClick={(deal) => setFlyerModal(deal)}
                 />
               ))}
             </div>
@@ -470,6 +474,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
+                  onFlyerClick={(deal) => setFlyerModal(deal)}
                 />
               ))}
             </div>
@@ -509,6 +514,10 @@ export default function ItemsPage() {
           }}
         />
       )}
+
+      {flyerModal && (
+        <FlyerDealsModal deal={flyerModal} onClose={() => setFlyerModal(null)} />
+      )}
     </div>
   );
 }
@@ -521,13 +530,15 @@ function ItemRow({
   onEdit,
   onDelete,
   onToggleWatch,
+  onFlyerClick,
 }: {
   item: ManagedItem;
   toggling: boolean;
-  flyerDeal?: { price: number; store: string };
+  flyerDeal?: DealResult;
   onEdit: () => void;
   onDelete: () => void;
   onToggleWatch: () => void;
+  onFlyerClick: (deal: DealResult) => void;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 shadow-sm flex items-center gap-3">
@@ -555,9 +566,12 @@ function ItemRow({
             <span className="text-xs text-blue-600">🎯 ${item.targetPrice.toFixed(2)}</span>
           )}
           {flyerDeal && (
-            <span className="text-xs text-green-600 font-medium">
-              🏷️ ${flyerDeal.price.toFixed(2)} at {flyerDeal.store}
-            </span>
+            <button
+              onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
+              className="text-xs text-green-600 font-medium hover:underline active:opacity-70">
+              🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+              {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
+            </button>
           )}
         </div>
       </Link>
