@@ -1,10 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import type { DealResult } from "@/app/api/flyer-deals/route";
+
+export interface FlyerDealEntry {
+  id?: number;
+  name: string;
+  currentPrice: number;
+  merchantName: string;
+  unitPrice: number | null;
+  unit: string | null;
+  saleStory: string | null;
+  validTo: string | null;
+  imageUrl: string | null;
+}
 
 interface Props {
-  deal: DealResult;
+  itemName: string;
+  deals: FlyerDealEntry[];
   onClose: () => void;
 }
 
@@ -12,7 +24,7 @@ function formatValidTo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
-export default function FlyerDealsModal({ deal, onClose }: Props) {
+export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   return (
@@ -35,16 +47,16 @@ export default function FlyerDealsModal({ deal, onClose }: Props) {
           <div className="px-5 pt-5 pb-2 border-b border-gray-100">
             <div className="flex items-start justify-between gap-2">
               <h2 className="text-base font-bold text-gray-900">
-                🏷️ Flyer deals for <span className="text-brand-600">{deal.itemName}</span>
+                🏷️ Flyer deals for <span className="text-brand-600">{itemName}</span>
               </h2>
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
             </div>
-            <p className="text-xs text-gray-500 mt-0.5">{deal.allDeals.length} deal{deal.allDeals.length !== 1 ? "s" : ""} found this week</p>
+            <p className="text-xs text-gray-500 mt-0.5">{deals.length} deal{deals.length !== 1 ? "s" : ""} found this week</p>
           </div>
 
           <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
-            {deal.allDeals.map((d) => (
-              <div key={d.id} className="bg-gray-50 rounded-xl p-3 flex gap-3 items-start">
+            {deals.map((d, i) => (
+              <div key={d.id ?? i} className="bg-gray-50 rounded-xl p-3 flex gap-3 items-start">
                 {d.imageUrl ? (
                   <img
                     src={d.imageUrl}

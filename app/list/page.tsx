@@ -7,7 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
 import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
-import FlyerDealsModal from "@/components/FlyerDealsModal";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
 
 interface ShoppingListItem {
   id: string;
@@ -52,7 +52,7 @@ export default function ShoppingListPage() {
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "clearChecked" | "clearAll" | "removeItem"; itemId?: string; itemName?: string } | null>(null);
-  const [flyerModal, setFlyerModal] = useState<DealResult | null>(null);
+  const [flyerModal, setFlyerModal] = useState<{ itemName: string; deals: FlyerDealEntry[] } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
@@ -84,7 +84,7 @@ export default function ShoppingListPage() {
       .then((data: DealResult[]) => {
         if (!Array.isArray(data)) return;
         const map = new Map<string, DealResult>();
-        data.forEach((d) => { if (d.isCheaper) map.set(d.itemName.toLowerCase(), d); });
+        data.forEach((d: DealResult) => { map.set(d.itemName.toLowerCase(), d); });
         setFlyerDeals(map);
       })
       .catch(() => {});
@@ -528,7 +528,7 @@ export default function ShoppingListPage() {
                         {trackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
                             <button
-                              onClick={() => setFlyerModal(trackedDeal)}
+                              onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
                               className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
                               🏷️ ${trackedDeal.bestDeal.currentPrice.toFixed(2)}
                               {trackedDeal.flyerUnitPrice && trackedDeal.flyerUnit
@@ -544,13 +544,15 @@ export default function ShoppingListPage() {
                         )}
                         {!trackedDeal && untrackedDeal && !item.checked && (
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-green-700 font-medium">
+                            <button
+                              onClick={() => setFlyerModal({ itemName: item.name, deals: [untrackedDeal] })}
+                              className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
                               🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
                               {untrackedDeal.unitPrice && untrackedDeal.unit
                                 ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
                                 : ""}
                               {" "}{untrackedDeal.merchantName}
-                            </span>
+                            </button>
                           </div>
                         )}
                         {!trackedDeal && !untrackedDeal && !item.checked && normalPrice && (
@@ -700,7 +702,7 @@ export default function ShoppingListPage() {
       )}
 
       {flyerModal && (
-        <FlyerDealsModal deal={flyerModal} onClose={() => setFlyerModal(null)} />
+        <FlyerDealsModal itemName={flyerModal.itemName} deals={flyerModal.deals} onClose={() => setFlyerModal(null)} />
       )}
     </div>
   );

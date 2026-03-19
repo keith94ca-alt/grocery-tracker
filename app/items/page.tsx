@@ -6,7 +6,7 @@ import { ItemCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
-import FlyerDealsModal from "@/components/FlyerDealsModal";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 
 const CATEGORIES = [
@@ -306,7 +306,7 @@ export default function ItemsPage() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
   const [showWatchModal, setShowWatchModal] = useState(false);
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
-  const [flyerModal, setFlyerModal] = useState<DealResult | null>(null);
+  const [flyerModal, setFlyerModal] = useState<{ itemName: string; deals: FlyerDealEntry[] } | null>(null);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -451,7 +451,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
-                  onFlyerClick={(deal) => setFlyerModal(deal)}
+                  onFlyerClick={(deal) => setFlyerModal({ itemName: item.name, deals: deal.allDeals })}
                 />
               ))}
             </div>
@@ -474,7 +474,7 @@ export default function ItemsPage() {
                   onEdit={() => setEditItem(item)}
                   onDelete={() => setDeleteItem(item)}
                   onToggleWatch={() => toggleWatched(item)}
-                  onFlyerClick={(deal) => setFlyerModal(deal)}
+                  onFlyerClick={(deal) => setFlyerModal({ itemName: item.name, deals: deal.allDeals })}
                 />
               ))}
             </div>
@@ -516,7 +516,7 @@ export default function ItemsPage() {
       )}
 
       {flyerModal && (
-        <FlyerDealsModal deal={flyerModal} onClose={() => setFlyerModal(null)} />
+        <FlyerDealsModal itemName={flyerModal.itemName} deals={flyerModal.deals} onClose={() => setFlyerModal(null)} />
       )}
     </div>
   );
