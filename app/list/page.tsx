@@ -525,16 +525,18 @@ export default function ShoppingListPage() {
                             <span className="text-xs text-green-600 font-medium">💰 ${item.price?.toFixed(2)}</span>
                           )}
                         </div>
-                        {!item.checked && normalPrice && (
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
-                            <span className="text-xs text-gray-500">
-                              ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} · {normalPrice.store}
-                            </span>
-                          </div>
-                        )}
-                        {!item.checked && (trackedDeal || untrackedDeal) && (
-                          <div className="flex items-center gap-2 mt-0.5">
+                        {!item.checked && (trackedDeal || untrackedDeal || normalPrice) && (
+                          <div className="flex flex-col gap-0.5 mt-0.5">
+                            {normalPrice && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
+                                <span className="text-xs text-gray-500">
+                                  ${normalPrice.price.toFixed(2)}/{normalPrice.unit.replace("per ", "")} · {normalPrice.store}
+                                </span>
+                              </div>
+                            )}
+                            {(trackedDeal || untrackedDeal) && (
+                          <div className="flex items-center gap-2">
                             {trackedDeal ? (
                               <button
                                 onClick={() => setFlyerModal({ itemName: item.name, deals: trackedDeal.allDeals })}
@@ -559,6 +561,8 @@ export default function ShoppingListPage() {
                             ) : null}
                             {trackedDeal?.savingsPercent && (
                               <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
+                            )}
+                          </div>
                             )}
                           </div>
                         )}
