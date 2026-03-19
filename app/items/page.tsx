@@ -554,8 +554,11 @@ function ItemRow({
         <p className="font-medium text-gray-900 truncate">{item.name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {item.lastPrice ? (() => {
+            // Use flyerDeal.normalUnitPrice (cheapest recorded) for comparison if available,
+            // otherwise fall back to lastPrice (most recent entry)
+            const normalUnitPrice = flyerDeal?.normalUnitPrice ?? item.lastPrice!.unitPrice;
             const flyerCheaper = flyerDeal?.flyerUnitPrice != null
-              ? flyerDeal.flyerUnitPrice < item.lastPrice!.unitPrice
+              ? flyerDeal.flyerUnitPrice < normalUnitPrice
               : null;
             const normalColor = flyerCheaper === null ? "text-brand-600" : flyerCheaper ? "text-gray-400" : "text-green-700";
             const flyerColor  = flyerCheaper === null ? "text-green-600" : flyerCheaper ? "text-green-700" : "text-gray-400";
@@ -563,7 +566,7 @@ function ItemRow({
               <>
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500 text-xs font-medium">🏪 Normal</span>
                 <span className={`text-xs font-medium ${normalColor}`}>
-                  ${item.lastPrice!.unitPrice.toFixed(2)}/{item.lastPrice!.unit.replace("per ", "")} · {item.lastPrice!.store}
+                  ${normalUnitPrice.toFixed(2)}/{item.lastPrice!.unit.replace("per ", "")} · {item.lastPrice!.store}
                 </span>
                 {flyerDeal && (
                   <button
