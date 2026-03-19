@@ -496,7 +496,7 @@ export default function ShoppingListPage() {
               {catItems.map((item) => {
                 const trackedDeal = !item.checked ? findFlyerDeal(item.name) : undefined;
                 const untrackedDeal = !item.checked && !trackedDeal ? findUntrackedFlyerDeal(item.name) : undefined;
-                const normalPrice = !item.checked && !trackedDeal && !untrackedDeal ? findNormalPrice(item.name) : undefined;
+                const normalPrice = !item.checked ? findNormalPrice(item.name) : undefined;
                 const form = priceForms.get(item.id);
                 const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
                   ? (parseFloat(form.price) / parseFloat(form.quantity || "1")).toFixed(2)
