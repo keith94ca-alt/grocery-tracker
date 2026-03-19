@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { simplifyFlyerName } from "@/lib/flipp";
@@ -524,7 +524,7 @@ function FlyerCard({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function FlyerPage() {
+function FlyerPageContent() {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "deals" ? "deals" : searchParams.get("tab") === "tracked" ? "tracked" : "new";
   const [items, setItems] = useState<FlyerBrowseItem[]>([]);
@@ -798,5 +798,13 @@ export default function FlyerPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function FlyerPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-4 text-gray-500">Loading…</div>}>
+      <FlyerPageContent />
+    </Suspense>
   );
 }
