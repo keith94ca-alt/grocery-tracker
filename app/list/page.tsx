@@ -6,6 +6,7 @@ import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 
 interface ShoppingListItem {
   id: string;
@@ -75,8 +76,7 @@ export default function ShoppingListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Load flyer deals and normal prices
-  useEffect(() => {
+  const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data: DealResult[]) => {
@@ -86,6 +86,13 @@ export default function ShoppingListPage() {
         setFlyerDeals(map);
       })
       .catch(() => {});
+  }, []);
+
+  useRefreshOnFocus(loadFlyerDeals);
+
+  // Load flyer deals and normal prices
+  useEffect(() => {
+    loadFlyerDeals();
 
     fetch("/api/items")
       .then((r) => r.json())

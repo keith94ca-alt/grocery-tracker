@@ -6,6 +6,7 @@ import Fuse from "fuse.js";
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import { useToast } from "@/components/Toast";
 import { normalizePrice } from "@/lib/units";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 
 interface PriceEntry {
   id: number;
@@ -65,7 +66,7 @@ export default function HomePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  function loadData() {
+  const loadData = useCallback(() => {
     // Load flyer deals
     fetch("/api/flyer-deals")
       .then((r) => r.json())
@@ -91,7 +92,7 @@ export default function HomePage() {
       })
       .catch(() => {})
       .finally(() => setEntriesLoading(false));
-  }
+  }, []);
 
   function refreshData() {
     setIsRefreshing(true);
@@ -101,7 +102,8 @@ export default function HomePage() {
     setTimeout(() => setIsRefreshing(false), 800);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [loadData]);
+  useRefreshOnFocus(loadData);
 
   // Pull-to-refresh touch handlers
   function handleTouchStart(e: React.TouchEvent) {

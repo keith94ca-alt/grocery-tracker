@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { simplifyFlyerName } from "@/lib/flipp";
@@ -8,6 +8,7 @@ import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route"
 import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
 import { FlyerCardSkeleton } from "@/components/Skeletons";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -567,7 +568,7 @@ function FlyerPageContent() {
     }
   });
 
-  useEffect(() => {
+  const loadFlyerData = useCallback(() => {
     fetch("/api/flyer-items")
       .then((r) => r.json())
       .then((d) => { if (Array.isArray(d)) setItems(d); })
@@ -580,6 +581,9 @@ function FlyerPageContent() {
       .then((d: DealResult[]) => { if (Array.isArray(d)) setDeals(d); })
       .catch(() => {});
   }, []);
+
+  useEffect(() => { loadFlyerData(); }, [loadFlyerData]);
+  useRefreshOnFocus(loadFlyerData);
 
   const stores = useMemo(() => {
     const s = new Set(items.map((i) => i.flippItem.merchantName));

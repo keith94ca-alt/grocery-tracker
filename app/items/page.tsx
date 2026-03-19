@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ItemCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -336,9 +337,7 @@ export default function ItemsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Load flyer deals for watched items
-  useEffect(() => {
-    if (loading) return;
+  const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
       .then((r) => r.json())
       .then((data) => {
@@ -350,7 +349,15 @@ export default function ItemsPage() {
         setFlyerDeals(map);
       })
       .catch(() => {});
-  }, [loading]);
+  }, []);
+
+  // Load flyer deals after items are loaded, and on focus return
+  useEffect(() => {
+    if (!loading) loadFlyerDeals();
+  }, [loading, loadFlyerDeals]);
+
+  const refreshAll = useCallback(() => { load(); loadFlyerDeals(); }, [load, loadFlyerDeals]);
+  useRefreshOnFocus(refreshAll);
 
   async function toggleWatched(item: ManagedItem) {
     setTogglingId(item.id);
