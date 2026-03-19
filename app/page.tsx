@@ -333,7 +333,7 @@ export default function HomePage() {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">🏷️ Deals This Week</h2>
-          <Link href="/flyer" className="text-xs text-brand-600 dark:text-brand-400 font-medium">Browse all →</Link>
+          <Link href="/flyer?tab=deals" className="text-xs text-brand-600 dark:text-brand-400 font-medium">Browse all →</Link>
         </div>
         {dealsLoading ? (
           <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4">

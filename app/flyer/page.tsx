@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { simplifyFlyerName } from "@/lib/flipp";
 import type { FlyerBrowseItem, TrackedMatch } from "@/app/api/flyer-items/route";
+import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlippItem } from "@/lib/flipp";
 import { FlyerCardSkeleton } from "@/components/Skeletons";
 import { useToast } from "@/components/Toast";
@@ -523,9 +525,11 @@ function FlyerCard({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function FlyerPage() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "deals" ? "deals" : searchParams.get("tab") === "tracked" ? "tracked" : "new";
   const [items, setItems] = useState<FlyerBrowseItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"new" | "tracked">("new");
+  const [tab, setTab] = useState<"new" | "tracked" | "deals">(initialTab);
   const [filter, setFilter] = useState("");
   const [storeFilter, setStoreFilter] = useState("All");
   const [modal, setModal] = useState<ModalState | null>(null);
@@ -534,6 +538,8 @@ export default function FlyerPage() {
   const [confirmDismiss, setConfirmDismiss] = useState<{ trackedItemId: number; flippId: number; itemName: string; trackedName: string } | null>(null);
   // Dismissed flyer items (per tracked item) — loaded from API
   const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(new Map());
+  // Best deals data
+  const [deals, setDeals] = useState<DealResult[]>([]);
 
   // Load dismissed matches from API
   useEffect(() => {
@@ -567,6 +573,12 @@ export default function FlyerPage() {
       .then((d) => { if (Array.isArray(d)) setItems(d); })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Load flyer deals for Best Deals tab
+    fetch("/api/flyer-deals")
+      .then((r) => r.json())
+      .then((d: DealResult[]) => { if (Array.isArray(d)) setDeals(d); })
+      .catch(() => {});
   }, []);
 
   const stores = useMemo(() => {
@@ -577,7 +589,14 @@ export default function FlyerPage() {
   const newItems = items.filter((i) => !i.trackedMatch);
   const trackedItems = items.filter((i) => i.trackedMatch);
 
-  const displayed = (tab === "new" ? newItems : trackedItems).filter((i) => {
+  // Deals tab: only show deals where flyer price is cheaper than normal
+  const cheaperDeals = deals.filter((d) => d.isCheaper);
+  const dealFlyerItems: FlyerBrowseItem[] = cheaperDeals.map((deal) => ({
+    flippItem: deal.bestDeal,
+    trackedMatch: { id: deal.itemId, name: deal.itemName, unit: deal.flyerUnit || "each", category: "Other", recentlyLogged: false },
+  }));
+
+  const displayed = (tab === "deals" ? dealFlyerItems : tab === "new" ? newItems : trackedItems).filter((i) => {
     // Hide if already added this session
     if (added.has(i.flippItem.id)) return false;
     // Hide if dismissed for this tracked item
@@ -709,6 +728,16 @@ export default function FlyerPage() {
         >
           On Your List {!loading && `(${trackedItems.length})`}
         </button>
+        <button
+          onClick={() => setTab("deals")}
+          className={`flex-1 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+            tab === "deals"
+              ? "border-green-500 text-green-600"
+              : "border-transparent text-gray-500"
+          }`}
+        >
+          💰 Best Deals {!loading && `(${cheaperDeals.length})`}
+        </button>
       </div>
 
       {/* Content */}
@@ -722,6 +751,8 @@ export default function FlyerPage() {
           <p className="text-sm">
             {tab === "new"
               ? "No new flyer items found this week"
+              : tab === "deals"
+              ? "No deals cheaper than your recorded prices this week"
               : "None of your tracked items are on flyer this week"}
           </p>
         </div>
