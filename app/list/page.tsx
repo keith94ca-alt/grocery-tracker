@@ -47,7 +47,7 @@ export default function ShoppingListPage() {
   const [suggestions, setSuggestions] = useState<{ id: number; name: string; category: string }[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [flyerDeals, setFlyerDeals] = useState<Map<string, DealResult>>(new Map());
-  const [untrackedFlyerDeals, setUntrackedFlyerDeals] = useState<Map<string, FlyerMatch>>(new Map());
+  const [untrackedFlyerDeals, setUntrackedFlyerDeals] = useState<Map<string, FlyerMatch[]>>(new Map());
   const [normalPrices, setNormalPrices] = useState<Map<string, { price: number; unit: string; store: string }>>(new Map());
   const [priceForms, setPriceForms] = useState<Map<string, InlinePriceForm>>(new Map());
   const [lightboxImg, setLightboxImg] = useState<{ src: string; alt: string } | null>(null);
@@ -121,13 +121,13 @@ export default function ShoppingListPage() {
     if (toCheck.length === 0) return;
     let cancelled = false;
     async function checkUntracked() {
-      const results = new Map<string, FlyerMatch>();
+      const results = new Map<string, FlyerMatch[]>();
       for (const item of toCheck.slice(0, 20)) {
         try {
           const res = await fetch(`/api/flyer-match?name=${encodeURIComponent(item.name)}`);
           const data: FlyerMatch[] = await res.json();
           if (Array.isArray(data) && data.length > 0 && !cancelled) {
-            results.set(item.name.toLowerCase(), data[0]);
+            results.set(item.name.toLowerCase(), data);
           }
         } catch {}
       }
@@ -331,8 +331,8 @@ export default function ShoppingListPage() {
     return undefined;
   }
 
-  function findUntrackedFlyerDeal(itemName: string): FlyerMatch | undefined {
-    return untrackedFlyerDeals.get(itemName.toLowerCase());
+  function findUntrackedFlyerDeals(itemName: string): FlyerMatch[] {
+    return untrackedFlyerDeals.get(itemName.toLowerCase()) ?? [];
   }
 
   function findNormalPrice(itemName: string): { price: number; unit: string; store: string } | undefined {
@@ -495,7 +495,8 @@ export default function ShoppingListPage() {
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1">{category}</h3>
               {catItems.map((item) => {
                 const trackedDeal = !item.checked ? findFlyerDeal(item.name) : undefined;
-                const untrackedDeal = !item.checked && !trackedDeal ? findUntrackedFlyerDeal(item.name) : undefined;
+                const untrackedDeals = !item.checked && !trackedDeal ? findUntrackedFlyerDeals(item.name) : [];
+                const untrackedDeal = untrackedDeals[0];
                 const normalPrice = !item.checked ? findNormalPrice(item.name) : undefined;
                 const form = priceForms.get(item.id);
                 const unitPrice = form?.price && parseFloat(form.price) > 0 && parseFloat(form.quantity || "1") > 0
@@ -550,13 +551,14 @@ export default function ShoppingListPage() {
                               </button>
                             ) : untrackedDeal ? (
                               <button
-                                onClick={() => setFlyerModal({ itemName: item.name, deals: [untrackedDeal] })}
+                                onClick={() => setFlyerModal({ itemName: item.name, deals: untrackedDeals })}
                                 className="text-xs text-green-700 font-medium hover:underline active:opacity-70 text-left">
                                 🏷️ ${untrackedDeal.currentPrice.toFixed(2)}
                                 {untrackedDeal.unitPrice && untrackedDeal.unit
                                   ? ` ($${untrackedDeal.unitPrice.toFixed(2)}/${untrackedDeal.unit.replace("per ", "")})`
                                   : ""}
                                 {" "}{untrackedDeal.merchantName}
+                                {untrackedDeals.length > 1 && <span className="text-gray-400 ml-1">+{untrackedDeals.length - 1} more</span>}
                               </button>
                             ) : null}
                             {trackedDeal?.savingsPercent && (
