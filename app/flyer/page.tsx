@@ -19,6 +19,27 @@ interface FlyerBrowseItemWithNormal extends FlyerBrowseItem {
   normalUnit?: string | null;
 }
 
+const CATEGORY_KEYWORDS: { category: string; keywords: string[] }[] = [
+  { category: "🥩 Meat & Protein", keywords: ["beef", "chicken", "pork", "turkey", "bacon", "ham", "sausage", "steak", "ground", "lamb", "veal", "bison", "shrimp", "salmon", "fish", "tuna", "seafood"] },
+  { category: "🥛 Dairy & Eggs", keywords: ["milk", "butter", "cheese", "eggs", "yogurt", "cream", "sour cream", "cream cheese", "cottage", "brie", "cheddar", "mozzarella"] },
+  { category: "🥦 Produce", keywords: ["apple", "banana", "orange", "tomato", "potato", "onion", "lettuce", "spinach", "broccoli", "carrot", "pepper", "mushroom", "avocado", "grape", "strawberry", "blueberry", "lemon", "lime", "cucumber", "zucchini", "celery", "kale", "cabbage", "garlic", "ginger"] },
+  { category: "🥖 Bakery", keywords: ["bread", "muffin", "bagel", "croissant", "bun", "roll", "loaf", "tortilla", "pita", "naan", "cake", "cookie", "pastry", "donut"] },
+  { category: "❄️ Frozen", keywords: ["frozen", "pizza", "ice cream", "waffles", "fries", "nuggets", "edamame"] },
+  { category: "🥫 Pantry", keywords: ["pasta", "rice", "cereal", "soup", "beans", "tomato sauce", "olive oil", "flour", "sugar", "honey", "jam", "peanut butter", "crackers", "oats", "quinoa"] },
+  { category: "🍿 Snacks", keywords: ["chips", "popcorn", "pretzels", "granola", "chocolate", "candy", "nuts", "trail mix", "bar", "snack"] },
+  { category: "🥤 Beverages", keywords: ["juice", "pop", "soda", "water", "sparkling", "coffee", "tea", "energy drink", "kombucha", "lemonade", "cider", "beer", "wine"] },
+  { category: "🧹 Household", keywords: ["toilet paper", "paper towel", "dish soap", "laundry", "detergent", "bleach", "cleaner", "garbage", "wrap", "foil", "bag"] },
+  { category: "🧴 Personal Care", keywords: ["shampoo", "conditioner", "body wash", "deodorant", "toothpaste", "razor", "lotion", "sunscreen", "soap"] },
+];
+
+function deriveFlyerCategory(name: string): string {
+  const lower = name.toLowerCase();
+  for (const { category, keywords } of CATEGORY_KEYWORDS) {
+    if (keywords.some((kw) => lower.includes(kw))) return category;
+  }
+  return "📦 Other";
+}
+
 // ── Image lightbox ─────────────────────────────────────────────────────────────
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -569,6 +590,7 @@ function FlyerPageContent() {
   const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(new Map());
   // Best deals data
   const [deals, setDeals] = useState<DealResult[]>([]);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Load dismissed matches from API
   useEffect(() => {
@@ -792,6 +814,56 @@ function FlyerPageContent() {
               ? "No deals cheaper than your recorded prices this week"
               : "None of your tracked items are on flyer this week"}
           </p>
+        </div>
+      ) : tab === "new" ? (
+        // "New Finds" tab — grouped by derived category
+        <div className="space-y-4 pb-4">
+          {(() => {
+            const groups = new Map<string, FlyerBrowseItemWithNormal[]>();
+            displayedFiltered.forEach((item) => {
+              const cat = deriveFlyerCategory(item.flippItem.name);
+              if (!groups.has(cat)) groups.set(cat, []);
+              groups.get(cat)!.push(item);
+            });
+            return Array.from(groups.entries()).map(([cat, catItems]) => {
+              const isCollapsed = collapsedCategories.has(cat);
+              return (
+                <div key={cat}>
+                  <button
+                    onClick={() => setCollapsedCategories((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(cat)) next.delete(cat); else next.add(cat);
+                      return next;
+                    })}
+                    className="w-full flex items-center justify-between px-1 py-1.5 text-left"
+                  >
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {cat} ({catItems.length})
+                    </h3>
+                    <span className="text-gray-400 text-xs">{isCollapsed ? "▶" : "▼"}</span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="space-y-2">
+                      {catItems.map((item) => (
+                        <FlyerCard
+                          key={item.flippItem.id}
+                          item={item}
+                          added={added.has(item.flippItem.id)}
+                          onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
+                          onDismiss={item.trackedMatch ? () => setConfirmDismiss({
+                            trackedItemId: item.trackedMatch!.id,
+                            flippId: item.flippItem.id,
+                            itemName: item.flippItem.name,
+                            trackedName: item.trackedMatch!.name,
+                          }) : undefined}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       ) : tab === "tracked" ? (
         // "On Your List" tab — grouped by tracked item
