@@ -778,6 +778,40 @@ function FlyerPageContent() {
               : "None of your tracked items are on flyer this week"}
           </p>
         </div>
+      ) : tab === "tracked" ? (
+        // "On Your List" tab — grouped by tracked item
+        <div className="space-y-4 pb-4">
+          {(() => {
+            const groups = new Map<number, { name: string; items: FlyerBrowseItemWithNormal[] }>();
+            displayedFiltered.forEach((item) => {
+              if (!item.trackedMatch) return;
+              const id = item.trackedMatch.id;
+              if (!groups.has(id)) groups.set(id, { name: item.trackedMatch.name, items: [] });
+              groups.get(id)!.items.push(item);
+            });
+            return Array.from(groups.entries()).map(([groupId, group]) => (
+              <div key={groupId} className="space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                  📦 {group.name}
+                </h3>
+                {group.items.map((item) => (
+                  <FlyerCard
+                    key={item.flippItem.id}
+                    item={item}
+                    added={added.has(item.flippItem.id)}
+                    onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
+                    onDismiss={item.trackedMatch ? () => setConfirmDismiss({
+                      trackedItemId: item.trackedMatch!.id,
+                      flippId: item.flippItem.id,
+                      itemName: item.flippItem.name,
+                      trackedName: item.trackedMatch!.name,
+                    }) : undefined}
+                  />
+                ))}
+              </div>
+            ));
+          })()}
+        </div>
       ) : (
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 pb-4">
           {displayedFiltered.map((item) => (
