@@ -14,6 +14,32 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
+interface FlyerBrowseItemWithNormal extends FlyerBrowseItem {
+  normalUnitPrice?: number | null;
+  normalUnit?: string | null;
+}
+
+const CATEGORY_KEYWORDS: { category: string; keywords: string[] }[] = [
+  { category: "🥩 Meat & Protein", keywords: ["beef", "chicken", "pork", "turkey", "bacon", "ham", "sausage", "steak", "ground", "lamb", "veal", "bison", "shrimp", "salmon", "fish", "tuna", "seafood"] },
+  { category: "🥛 Dairy & Eggs", keywords: ["milk", "butter", "cheese", "eggs", "yogurt", "cream", "sour cream", "cream cheese", "cottage", "brie", "cheddar", "mozzarella"] },
+  { category: "🥦 Produce", keywords: ["apple", "banana", "orange", "tomato", "potato", "onion", "lettuce", "spinach", "broccoli", "carrot", "pepper", "mushroom", "avocado", "grape", "strawberry", "blueberry", "lemon", "lime", "cucumber", "zucchini", "celery", "kale", "cabbage", "garlic", "ginger"] },
+  { category: "🥖 Bakery", keywords: ["bread", "muffin", "bagel", "croissant", "bun", "roll", "loaf", "tortilla", "pita", "naan", "cake", "cookie", "pastry", "donut"] },
+  { category: "❄️ Frozen", keywords: ["frozen", "pizza", "ice cream", "waffles", "fries", "nuggets", "edamame"] },
+  { category: "🥫 Pantry", keywords: ["pasta", "rice", "cereal", "soup", "beans", "tomato sauce", "olive oil", "flour", "sugar", "honey", "jam", "peanut butter", "crackers", "oats", "quinoa"] },
+  { category: "🍿 Snacks", keywords: ["chips", "popcorn", "pretzels", "granola", "chocolate", "candy", "nuts", "trail mix", "bar", "snack"] },
+  { category: "🥤 Beverages", keywords: ["juice", "pop", "soda", "water", "sparkling", "coffee", "tea", "energy drink", "kombucha", "lemonade", "cider", "beer", "wine"] },
+  { category: "🧹 Household", keywords: ["toilet paper", "paper towel", "dish soap", "laundry", "detergent", "bleach", "cleaner", "garbage", "wrap", "foil", "bag"] },
+  { category: "🧴 Personal Care", keywords: ["shampoo", "conditioner", "body wash", "deodorant", "toothpaste", "razor", "lotion", "sunscreen", "soap"] },
+];
+
+function deriveFlyerCategory(name: string): string {
+  const lower = name.toLowerCase();
+  for (const { category, keywords } of CATEGORY_KEYWORDS) {
+    if (keywords.some((kw) => lower.includes(kw))) return category;
+  }
+  return "📦 Other";
+}
+
 // ── Image lightbox ─────────────────────────────────────────────────────────────
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -412,6 +438,15 @@ function AddModal({
   );
 }
 
+function getExpiryBadge(validTo: string | null | undefined): string | null {
+  if (!validTo) return null;
+  const hoursLeft = (new Date(validTo).getTime() - Date.now()) / 3600000;
+  if (hoursLeft < 0) return null;
+  if (hoursLeft <= 24) return "last day";
+  if (hoursLeft <= 48) return "ends tomorrow";
+  return null;
+}
+
 // ── Item card ─────────────────────────────────────────────────────────────────
 
 function FlyerCard({
@@ -420,13 +455,18 @@ function FlyerCard({
   onAction,
   onDismiss,
 }: {
-  item: FlyerBrowseItem;
+  item: FlyerBrowseItemWithNormal;
   added: boolean;
   onAction: () => void;
   onDismiss?: () => void;
 }) {
-  const { flippItem, trackedMatch } = item;
+  const { flippItem, trackedMatch, normalUnitPrice, normalUnit } = item;
   const unitLabel = flippItem.unit?.replace("per ", "");
+  // Green/grey comparison colouring for best deals tab
+  const canCompare = flippItem.unitPrice !== null && normalUnitPrice != null && flippItem.unit === normalUnit;
+  const flyerCheaper = canCompare ? flippItem.unitPrice! < normalUnitPrice! : null;
+  const flyerPriceColor = flyerCheaper === true ? "text-green-700" : flyerCheaper === false ? "text-gray-400" : "text-gray-900";
+  const normalPriceColor = flyerCheaper === false ? "text-green-700" : "text-gray-400";
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   return (
@@ -452,6 +492,12 @@ function FlyerCard({
         {flippItem.saleStory && (
           <p className="text-xs text-orange-600 font-medium mt-0.5">{flippItem.saleStory}</p>
         )}
+        {(() => {
+          const badge = getExpiryBadge(flippItem.validTo);
+          return badge ? (
+            <span className="inline-block mt-0.5 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">⏰ {badge}</span>
+          ) : null;
+        })()}
         {trackedMatch && !added && (
           <div className="flex items-center gap-1 mt-1">
             <p className="text-xs text-brand-600">
@@ -471,12 +517,15 @@ function FlyerCard({
       </div>
 
       <div className="shrink-0 text-right">
-        <p className="text-base font-bold text-gray-900">${flippItem.currentPrice.toFixed(2)}</p>
+        <p className={`text-base font-bold ${flyerPriceColor}`}>${flippItem.currentPrice.toFixed(2)}</p>
         {flippItem.unitPrice && unitLabel && (
-          <p className="text-xs text-gray-500">${flippItem.unitPrice.toFixed(2)}/{unitLabel}</p>
+          <p className={`text-xs ${flyerPriceColor}`}>${flippItem.unitPrice.toFixed(2)}/{unitLabel}</p>
         )}
         {!flippItem.unitPrice && flippItem.postPriceText && (
           <p className="text-xs text-gray-500">${flippItem.currentPrice.toFixed(2)}/{flippItem.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
+        )}
+        {normalUnitPrice && normalUnit && (
+          <p className={`text-xs mt-0.5 ${normalPriceColor}`}>Normal: ${normalUnitPrice.toFixed(2)}/{normalUnit.replace("per ", "")}</p>
         )}
         {added ? (
           <span className="mt-2 inline-block text-xs text-green-600 font-semibold">✓ Added</span>
@@ -533,6 +582,9 @@ function FlyerPageContent() {
   const [tab, setTab] = useState<"new" | "tracked" | "deals">(initialTab);
   const [filter, setFilter] = useState("");
   const [storeFilter, setStoreFilter] = useState("All");
+  const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [modal, setModal] = useState<ModalState | null>(null);
   const { toast } = useToast();
   // Confirm dialog for dismiss
@@ -541,6 +593,7 @@ function FlyerPageContent() {
   const [dismissed, setDismissed] = useState<Map<string, Set<number>>>(new Map());
   // Best deals data
   const [deals, setDeals] = useState<DealResult[]>([]);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // Load dismissed matches from API
   useEffect(() => {
@@ -597,12 +650,15 @@ function FlyerPageContent() {
 
   // Deals tab: only show deals where flyer price is cheaper than normal
   const cheaperDeals = deals.filter((d) => d.isCheaper);
-  const dealFlyerItems: FlyerBrowseItem[] = cheaperDeals.map((deal) => ({
+  const dealFlyerItems: FlyerBrowseItemWithNormal[] = cheaperDeals.map((deal) => ({
     flippItem: deal.bestDeal,
     trackedMatch: { id: deal.itemId, name: deal.itemName, unit: deal.flyerUnit || "each", category: "Other", recentlyLogged: false },
+    normalUnitPrice: deal.normalUnitPrice,
+    normalUnit: deal.normalUnit,
   }));
 
-  const displayed = (tab === "deals" ? dealFlyerItems : tab === "new" ? newItems : trackedItems).filter((i) => {
+  const displayed = (tab === "deals" ? dealFlyerItems : tab === "new" ? newItems : trackedItems) as FlyerBrowseItemWithNormal[];
+  const displayedFiltered = displayed.filter((i) => {
     // Hide if already added this session
     if (added.has(i.flippItem.id)) return false;
     // Hide if dismissed for this tracked item
@@ -611,12 +667,13 @@ function FlyerPageContent() {
       const dismissedSet = dismissed.get(key);
       if (dismissedSet && dismissedSet.has(i.flippItem.id)) return false;
     }
-    const matchesStore = storeFilter === "All" || i.flippItem.merchantName === storeFilter;
+    const matchesStore = selectedStores.size === 0 || selectedStores.has(i.flippItem.merchantName);
+    const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(deriveFlyerCategory(i.flippItem.name));
     const matchesFilter =
       !filter ||
       i.flippItem.name.toLowerCase().includes(filter.toLowerCase()) ||
       i.trackedMatch?.name.toLowerCase().includes(filter.toLowerCase());
-    return matchesStore && matchesFilter;
+    return matchesStore && matchesCategory && matchesFilter;
   });
 
   function handleDismiss(trackedItemId: number, flippId: number) {
@@ -695,22 +752,133 @@ function FlyerPageContent() {
         className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
       />
 
-      {/* Store filter */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        {stores.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStoreFilter(s)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              storeFilter === s
-                ? "bg-brand-600 text-white border-brand-600"
-                : "bg-white text-gray-600 border-gray-300"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Filter button */}
+      {(() => {
+        const activeCount = selectedStores.size + selectedCategories.size;
+        const availableCategories = [...new Set(newItems.map((i) => deriveFlyerCategory(i.flippItem.name)))].sort();
+        return (
+          <>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFilterSheet(true)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                  activeCount > 0
+                    ? "bg-brand-600 text-white border-brand-600"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                <span>⚙️ Filter</span>
+                {activeCount > 0 && (
+                  <span className="bg-white text-brand-600 rounded-full text-xs font-bold w-4 h-4 flex items-center justify-center leading-none">
+                    {activeCount}
+                  </span>
+                )}
+              </button>
+              {activeCount > 0 && (
+                <button
+                  onClick={() => { setSelectedStores(new Set()); setSelectedCategories(new Set()); }}
+                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+              {activeCount > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {selectedStores.size > 0 && `${selectedStores.size} store${selectedStores.size !== 1 ? "s" : ""}`}
+                  {selectedStores.size > 0 && selectedCategories.size > 0 && " · "}
+                  {selectedCategories.size > 0 && `${selectedCategories.size} categor${selectedCategories.size !== 1 ? "ies" : "y"}`}
+                </p>
+              )}
+            </div>
+
+            {/* Filter bottom sheet */}
+            {showFilterSheet && (
+              <>
+                <div className="fixed inset-0 bg-black/40 z-[60]" onClick={() => setShowFilterSheet(false)} />
+                <div className="fixed inset-x-0 bottom-0 z-[70] bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col">
+                  <div className="px-5 pt-4 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">Filter Flyers</h3>
+                    <div className="flex items-center gap-3">
+                      {(selectedStores.size + selectedCategories.size) > 0 && (
+                        <button
+                          onClick={() => { setSelectedStores(new Set()); setSelectedCategories(new Set()); }}
+                          className="text-xs text-red-500 font-medium"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                      <button onClick={() => setShowFilterSheet(false)} className="text-gray-400 text-xl leading-none">×</button>
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+                    {/* Stores */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Stores</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {stores.filter((s) => s !== "All").map((s) => (
+                          <button
+                            key={s}
+                            onClick={() => setSelectedStores((prev) => {
+                              const next = new Set(prev);
+                              next.has(s) ? next.delete(s) : next.add(s);
+                              return next;
+                            })}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors text-left ${
+                              selectedStores.has(s)
+                                ? "bg-brand-600 text-white border-brand-600"
+                                : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedStores.has(s) ? "bg-white border-white" : "border-gray-400"}`}>
+                              {selectedStores.has(s) && <span className="text-brand-600 text-xs leading-none">✓</span>}
+                            </span>
+                            <span className="truncate text-xs font-medium">{s}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Categories */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Categories</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {availableCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            onClick={() => setSelectedCategories((prev) => {
+                              const next = new Set(prev);
+                              next.has(cat) ? next.delete(cat) : next.add(cat);
+                              return next;
+                            })}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors text-left ${
+                              selectedCategories.has(cat)
+                                ? "bg-brand-600 text-white border-brand-600"
+                                : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+                            }`}
+                          >
+                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedCategories.has(cat) ? "bg-white border-white" : "border-gray-400"}`}>
+                              {selectedCategories.has(cat) && <span className="text-brand-600 text-xs leading-none">✓</span>}
+                            </span>
+                            <span className="truncate text-xs font-medium">{cat}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800">
+                    <button
+                      onClick={() => setShowFilterSheet(false)}
+                      className="w-full py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        );
+      })()}
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
@@ -751,7 +919,7 @@ function FlyerPageContent() {
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => <FlyerCardSkeleton key={i} />)}
         </div>
-      ) : displayed.length === 0 ? (
+      ) : displayedFiltered.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <p className="text-4xl mb-2">🔍</p>
           <p className="text-sm">
@@ -762,9 +930,93 @@ function FlyerPageContent() {
               : "None of your tracked items are on flyer this week"}
           </p>
         </div>
+      ) : tab === "new" ? (
+        // "New Finds" tab — grouped by derived category
+        <div className="space-y-4 pb-4">
+          {(() => {
+            const groups = new Map<string, FlyerBrowseItemWithNormal[]>();
+            displayedFiltered.forEach((item) => {
+              const cat = deriveFlyerCategory(item.flippItem.name);
+              if (!groups.has(cat)) groups.set(cat, []);
+              groups.get(cat)!.push(item);
+            });
+            return Array.from(groups.entries()).map(([cat, catItems]) => {
+              const isCollapsed = collapsedCategories.has(cat);
+              return (
+                <div key={cat}>
+                  <button
+                    onClick={() => setCollapsedCategories((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(cat)) next.delete(cat); else next.add(cat);
+                      return next;
+                    })}
+                    className="w-full flex items-center justify-between px-1 py-1.5 text-left"
+                  >
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      {cat} ({catItems.length})
+                    </h3>
+                    <span className="text-gray-400 text-xs">{isCollapsed ? "▶" : "▼"}</span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="space-y-2">
+                      {catItems.map((item) => (
+                        <FlyerCard
+                          key={item.flippItem.id}
+                          item={item}
+                          added={added.has(item.flippItem.id)}
+                          onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
+                          onDismiss={item.trackedMatch ? () => setConfirmDismiss({
+                            trackedItemId: item.trackedMatch!.id,
+                            flippId: item.flippItem.id,
+                            itemName: item.flippItem.name,
+                            trackedName: item.trackedMatch!.name,
+                          }) : undefined}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          })()}
+        </div>
+      ) : tab === "tracked" ? (
+        // "On Your List" tab — grouped by tracked item
+        <div className="space-y-4 pb-4">
+          {(() => {
+            const groups = new Map<number, { name: string; items: FlyerBrowseItemWithNormal[] }>();
+            displayedFiltered.forEach((item) => {
+              if (!item.trackedMatch) return;
+              const id = item.trackedMatch.id;
+              if (!groups.has(id)) groups.set(id, { name: item.trackedMatch.name, items: [] });
+              groups.get(id)!.items.push(item);
+            });
+            return Array.from(groups.entries()).map(([groupId, group]) => (
+              <div key={groupId} className="space-y-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-1">
+                  📦 {group.name}
+                </h3>
+                {group.items.map((item) => (
+                  <FlyerCard
+                    key={item.flippItem.id}
+                    item={item}
+                    added={added.has(item.flippItem.id)}
+                    onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
+                    onDismiss={item.trackedMatch ? () => setConfirmDismiss({
+                      trackedItemId: item.trackedMatch!.id,
+                      flippId: item.flippItem.id,
+                      itemName: item.flippItem.name,
+                      trackedName: item.trackedMatch!.name,
+                    }) : undefined}
+                  />
+                ))}
+              </div>
+            ));
+          })()}
+        </div>
       ) : (
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 pb-4">
-          {displayed.map((item) => (
+          {displayedFiltered.map((item) => (
             <FlyerCard
               key={item.flippItem.id}
               item={item}

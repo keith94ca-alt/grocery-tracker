@@ -382,6 +382,11 @@ export default function HomePage() {
                       <span className="text-xs text-gray-500">${deal.flyerUnitPrice.toFixed(2)}/{deal.flyerUnit?.replace("per ", "")}</span>
                     )}
                   </div>
+                  {deal.normalUnitPrice && deal.normalUnit && (
+                    <p className="text-xs text-gray-400">
+                      Normal: ${deal.normalUnitPrice.toFixed(2)}/{deal.normalUnit.replace("per ", "")}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2">
                     {deal.savingsPercent && deal.savingsPercent > 0 ? (
                       <span className="text-xs font-semibold text-green-600">↓{deal.savingsPercent}% vs normal</span>

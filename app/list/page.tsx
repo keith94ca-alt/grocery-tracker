@@ -57,8 +57,7 @@ export default function ShoppingListPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  // Load from API
-  useEffect(() => {
+  const loadShoppingList = useCallback(() => {
     fetch("/api/shopping-list")
       .then((r) => r.json())
       .then((data) => {
@@ -76,7 +75,10 @@ export default function ShoppingListPage() {
       })
       .catch(() => toast("Failed to load shopping list", "error"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
+
+  // Load from API on mount
+  useEffect(() => { loadShoppingList(); }, [loadShoppingList]);
 
   const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
@@ -91,19 +93,14 @@ export default function ShoppingListPage() {
   }, []);
 
   useRefreshOnFocus(loadFlyerDeals);
+  useRefreshOnFocus(loadShoppingList);
 
-  // Load flyer deals and normal prices
-  useEffect(() => {
-    loadFlyerDeals();
-
-    fetch("/api/items")
+  const loadNormalPrices = useCallback((listItems: ShoppingListItem[]) => {
+    if (listItems.length === 0) return;
+    const names = listItems.map((i) => i.name);
+    fetch(`/api/normal-prices?names=${encodeURIComponent(names.join(","))}`)
       .then((r) => r.json())
-      .then(async (itemData) => {
-        if (!Array.isArray(itemData)) return;
-        const names = itemData.map((i: { name: string }) => i.name);
-        if (names.length === 0) return;
-        const res = await fetch(`/api/normal-prices?names=${encodeURIComponent(names.join(","))}`);
-        const normals: { itemName: string; price: number; unit: string; store: string }[] = await res.json();
+      .then((normals: { itemName: string; price: number; unit: string; store: string }[]) => {
         if (Array.isArray(normals)) {
           const map = new Map<string, { price: number; unit: string; store: string }>();
           normals.forEach((n) => { map.set(n.itemName.toLowerCase(), { price: n.price, unit: n.unit, store: n.store }); });
@@ -112,6 +109,16 @@ export default function ShoppingListPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Trigger initial flyer deal load on mount
+  useEffect(() => {
+    loadFlyerDeals();
+  }, [loadFlyerDeals]);
+
+  // Load normal prices whenever items list changes
+  useEffect(() => {
+    if (items.length > 0) loadNormalPrices(items);
+  }, [items, loadNormalPrices]);
 
   // Check flyer deals for untracked items
   useEffect(() => {
@@ -321,6 +328,15 @@ export default function ShoppingListPage() {
     }
   }
 
+  function getFlyerExpiryBadge(validTo: string | null | undefined): string | null {
+    if (!validTo) return null;
+    const hoursLeft = (new Date(validTo).getTime() - Date.now()) / 3600000;
+    if (hoursLeft < 0) return null;
+    if (hoursLeft <= 24) return "last day";
+    if (hoursLeft <= 48) return "ends tomorrow";
+    return null;
+  }
+
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
     const exact = flyerDeals.get(lower);
@@ -338,6 +354,78 @@ export default function ShoppingListPage() {
   function findNormalPrice(itemName: string): { price: number; unit: string; store: string } | undefined {
     return normalPrices.get(itemName.toLowerCase());
   }
+
+  // Compute best store this week
+  const bestStoreBanner = (() => {
+    const unchecked = items.filter((i) => !i.checked);
+    if (unchecked.length === 0) return null;
+
+    // Build a map: store → { count, totalPrice, deals[] }
+    const storeMap = new Map<string, { count: number; totalPrice: number; deals: FlyerDealEntry[] }>();
+
+    for (const item of unchecked) {
+      const lower = item.name.toLowerCase();
+      // Check tracked flyer deals
+      const deal = flyerDeals.get(lower) ?? (() => {
+        for (const [key, d] of flyerDeals) {
+          if (lower.includes(key) || key.includes(lower)) return d;
+        }
+        return undefined;
+      })();
+
+      if (deal) {
+        const store = deal.bestDeal.merchantName;
+        const price = deal.bestDeal.currentPrice;
+        const entry = storeMap.get(store) ?? { count: 0, totalPrice: 0, deals: [] };
+        entry.count++;
+        entry.totalPrice += price;
+        entry.deals.push({
+          id: deal.bestDeal.id,
+          name: deal.bestDeal.name,
+          currentPrice: deal.bestDeal.currentPrice,
+          merchantName: deal.bestDeal.merchantName,
+          unitPrice: deal.flyerUnitPrice,
+          unit: deal.flyerUnit,
+          saleStory: deal.bestDeal.saleStory,
+          validTo: deal.bestDeal.validTo,
+          imageUrl: deal.bestDeal.imageUrl,
+        });
+        storeMap.set(store, entry);
+      } else {
+        // Check untracked flyer deals
+        const untracked = untrackedFlyerDeals.get(lower);
+        if (untracked && untracked.length > 0) {
+          const best = untracked[0];
+          const store = best.merchantName;
+          const price = best.currentPrice;
+          const entry = storeMap.get(store) ?? { count: 0, totalPrice: 0, deals: [] };
+          entry.count++;
+          entry.totalPrice += price;
+          entry.deals.push({
+            name: best.name,
+            currentPrice: best.currentPrice,
+            merchantName: best.merchantName,
+            unitPrice: best.unitPrice,
+            unit: best.unit,
+            saleStory: best.saleStory,
+            validTo: best.validTo,
+            imageUrl: best.imageUrl,
+          });
+          storeMap.set(store, entry);
+        }
+      }
+    }
+
+    if (storeMap.size === 0) return null;
+
+    // Pick store with highest item count (tie-break: lowest total price)
+    const best = Array.from(storeMap.entries()).sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+      return a[1].totalPrice - b[1].totalPrice;
+    })[0];
+
+    return { store: best[0], count: best[1].count, totalPrice: best[1].totalPrice, deals: best[1].deals };
+  })();
 
   const sorted = [...items].sort((a, b) => {
     if (a.checked !== b.checked) return a.checked ? 1 : -1;
@@ -447,6 +535,23 @@ export default function ShoppingListPage() {
             Clear all
           </button>
         </div>
+      )}
+
+      {/* Best store banner */}
+      {bestStoreBanner && bestStoreBanner.count >= 2 && (
+        <button
+          onClick={() => setFlyerModal({ itemName: `Deals at ${bestStoreBanner.store}`, deals: bestStoreBanner.deals })}
+          className="w-full bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl px-4 py-3 flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors active:scale-[0.99] text-left"
+        >
+          <span className="text-lg">🏪</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              {bestStoreBanner.store} has deals on {bestStoreBanner.count} item{bestStoreBanner.count !== 1 ? "s" : ""} this week
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400">~${bestStoreBanner.totalPrice.toFixed(2)} combined · tap to see deals</p>
+          </div>
+          <span className="text-blue-400 dark:text-blue-500 text-sm">›</span>
+        </button>
       )}
 
       {/* Category filter */}
@@ -571,6 +676,12 @@ export default function ShoppingListPage() {
                                 {trackedDeal?.savingsPercent && (
                                   <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
                                 )}
+                                {(() => {
+                                  const badge = getFlyerExpiryBadge(trackedDeal?.bestDeal.validTo ?? untrackedDeal?.validTo);
+                                  return badge ? (
+                                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">⏰ {badge}</span>
+                                  ) : null;
+                                })()}
                               </div>
                             )}
                           </div>

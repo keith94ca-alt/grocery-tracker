@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
                 }
               : null;
 
-          return { id: item.id, name: item.name, category: item.category, unit: item.unit, watched: item.watched, stats };
+          return { id: item.id, name: item.name, category: item.category, unit: item.unit, watched: item.watched, targetPrice: item.targetPrice, stats };
         })
         // Sort by most recently updated first
         .sort((a, b) => {

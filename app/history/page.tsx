@@ -11,10 +11,12 @@ interface Entry {
   price: number;
   quantity: number;
   unitPrice: number;
+  unit: string;
   store: string;
   date: string;
   notes: string | null;
   source: string;
+  priceType: string | null;
   item: { name: string; unit: string };
 }
 
@@ -265,6 +267,15 @@ export default function HistoryPage() {
                   </p>
                   {entry.quantity !== 1 && (
                     <p className="text-xs text-gray-400">${entry.price.toFixed(2)} total</p>
+                  )}
+                  {entry.priceType && (
+                    <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded font-medium ${
+                      entry.priceType === "sale"
+                        ? "bg-orange-100 text-orange-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}>
+                      {entry.priceType === "sale" ? "🏷️ sale" : "🏪 normal"}
+                    </span>
                   )}
                 </div>
               </div>

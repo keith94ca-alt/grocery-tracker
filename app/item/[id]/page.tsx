@@ -9,6 +9,7 @@ import type { FlippItem } from "@/lib/flipp";
 import PriceChart from "@/components/PriceChart";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
 
 interface PriceEntry {
   id: number;
@@ -188,6 +189,10 @@ function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () 
         price: "text-gray-800", divider: "border-gray-100" };
 
   const canCompare = flyerUnitPrice !== null && normalUnitPrice !== null && flyerUnit === normalUnit;
+  // Per-price colour: green = cheaper, grey = more expensive
+  const flyerCheaper = canCompare ? flyerUnitPrice! < normalUnitPrice! : null;
+  const flyerPriceColor = flyerCheaper === true ? "text-green-700" : flyerCheaper === false ? "text-gray-400" : colour.price;
+  const normalPriceColor = flyerCheaper === false ? "text-green-700" : flyerCheaper === true ? "text-gray-400" : "text-gray-700";
 
   return (
     <>
@@ -224,12 +229,12 @@ function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () 
             />
           )}
           <div className="text-right">
-            <p className={`text-xl font-bold ${colour.price}`}>
+            <p className={`text-xl font-bold ${flyerPriceColor}`}>
               ${bestDeal.currentPrice.toFixed(2)}
             </p>
             {/* Show the normalised per-kg/L price if we have it */}
             {flyerUnitPrice !== null && flyerUnit && (
-              <p className="text-xs text-gray-500 font-medium">
+              <p className={`text-xs font-medium ${flyerPriceColor}`}>
                 ${flyerUnitPrice.toFixed(2)}/{flyerUnit.replace("per ", "")}
               </p>
             )}
@@ -240,9 +245,9 @@ function FlyerDealBanner({ deal, onViewAll }: { deal: DealResult; onViewAll: () 
       <div className={`mt-3 pt-3 border-t ${colour.divider} flex items-center justify-between text-xs flex-wrap gap-2`}>
         <div className="flex gap-3 flex-wrap">
           {canCompare && (
-            <span className="text-gray-500">
+            <span className={normalPriceColor}>
               Your normal{normalStore ? ` (${normalStore})` : ""}:{" "}
-              <strong className="text-gray-700">
+              <strong>
                 ${normalUnitPrice!.toFixed(2)}/{normalUnit!.replace("per ", "")}
               </strong>
             </span>
@@ -807,7 +812,23 @@ export default function ItemPage() {
       </div>
 
       {/* All Flyer Deals Modal */}
-      {showDealsModal && <AllDealsModal deals={allDeals} onClose={() => setShowDealsModal(false)} />}
+      {showDealsModal && (
+        <FlyerDealsModal
+          itemName={item.name}
+          deals={allDeals.map((d: FlippItem): FlyerDealEntry => ({
+            id: d.id,
+            name: d.name,
+            currentPrice: d.currentPrice,
+            merchantName: d.merchantName,
+            unitPrice: d.unitPrice,
+            unit: d.unit,
+            saleStory: d.saleStory,
+            validTo: d.validTo,
+            imageUrl: d.imageUrl,
+          }))}
+          onClose={() => setShowDealsModal(false)}
+        />
+      )}
 
       {/* Confirm delete price entry */}
       {confirmDeleteEntry && (
