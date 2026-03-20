@@ -417,6 +417,15 @@ function AddModal({
   );
 }
 
+function getExpiryBadge(validTo: string | null | undefined): string | null {
+  if (!validTo) return null;
+  const hoursLeft = (new Date(validTo).getTime() - Date.now()) / 3600000;
+  if (hoursLeft < 0) return null;
+  if (hoursLeft <= 24) return "last day";
+  if (hoursLeft <= 48) return "ends tomorrow";
+  return null;
+}
+
 // ── Item card ─────────────────────────────────────────────────────────────────
 
 function FlyerCard({
@@ -462,6 +471,12 @@ function FlyerCard({
         {flippItem.saleStory && (
           <p className="text-xs text-orange-600 font-medium mt-0.5">{flippItem.saleStory}</p>
         )}
+        {(() => {
+          const badge = getExpiryBadge(flippItem.validTo);
+          return badge ? (
+            <span className="inline-block mt-0.5 text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">⏰ {badge}</span>
+          ) : null;
+        })()}
         {trackedMatch && !added && (
           <div className="flex items-center gap-1 mt-1">
             <p className="text-xs text-brand-600">

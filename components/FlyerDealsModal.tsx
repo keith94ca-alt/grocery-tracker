@@ -24,6 +24,15 @@ function formatValidTo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 }
 
+function getExpiryBadge(validTo: string | null): string | null {
+  if (!validTo) return null;
+  const hoursLeft = (new Date(validTo).getTime() - Date.now()) / 3600000;
+  if (hoursLeft < 0) return null;
+  if (hoursLeft <= 24) return "last day";
+  if (hoursLeft <= 48) return "ends tomorrow";
+  return null;
+}
+
 export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -55,7 +64,9 @@ export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
           </div>
 
           <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
-            {deals.map((d, i) => (
+            {deals.map((d, i) => {
+              const expiryBadge = getExpiryBadge(d.validTo);
+              return (
               <div key={d.id ?? i} className="bg-gray-50 rounded-xl p-3 flex gap-3 items-start">
                 {d.imageUrl ? (
                   <img
@@ -71,7 +82,14 @@ export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
                   <p className="text-sm font-semibold text-gray-900 leading-snug">{d.name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{d.merchantName}</p>
                   {d.saleStory && <p className="text-xs text-orange-600 font-medium mt-0.5">{d.saleStory}</p>}
-                  {d.validTo && <p className="text-xs text-gray-400 mt-0.5">Until {formatValidTo(d.validTo)}</p>}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {d.validTo && <p className="text-xs text-gray-400">Until {formatValidTo(d.validTo)}</p>}
+                    {expiryBadge && (
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                        ⏰ {expiryBadge}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-1.5">
                     <span className="text-lg font-bold text-green-700">${d.currentPrice.toFixed(2)}</span>
                     {d.unitPrice && d.unit && (
@@ -80,7 +98,8 @@ export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="px-5 pb-5 pt-2">

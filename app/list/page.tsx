@@ -328,6 +328,15 @@ export default function ShoppingListPage() {
     }
   }
 
+  function getFlyerExpiryBadge(validTo: string | null | undefined): string | null {
+    if (!validTo) return null;
+    const hoursLeft = (new Date(validTo).getTime() - Date.now()) / 3600000;
+    if (hoursLeft < 0) return null;
+    if (hoursLeft <= 24) return "last day";
+    if (hoursLeft <= 48) return "ends tomorrow";
+    return null;
+  }
+
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
     const exact = flyerDeals.get(lower);
@@ -644,6 +653,12 @@ export default function ShoppingListPage() {
                                 {trackedDeal?.savingsPercent && (
                                   <span className="text-xs text-green-600 font-semibold">↓{trackedDeal.savingsPercent}%</span>
                                 )}
+                                {(() => {
+                                  const badge = getFlyerExpiryBadge(trackedDeal?.bestDeal.validTo ?? untrackedDeal?.validTo);
+                                  return badge ? (
+                                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">⏰ {badge}</span>
+                                  ) : null;
+                                })()}
                               </div>
                             )}
                           </div>
