@@ -4,17 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/", label: "Home", icon: "🏠" },
-  { href: "/flyer", label: "Flyer", icon: "🏷️" },
-  { href: "/add", label: "Add", icon: "➕" },
-  { href: "/items", label: "Items", icon: "📦" },
-  { href: "/list", label: "List", icon: "🛒" },
+  { href: "/", label: "Home", short: "Home", icon: "🏠" },
+  { href: "/flyer", label: "Flyers", short: "Flyers", icon: "🏷️" },
+  { href: "/add", label: "Add Price", short: "Add", icon: "➕" },
+  { href: "/items", label: "My Items", short: "Items", icon: "📦" },
+  { href: "/list", label: "Shopping List", short: "List", icon: "🛒" },
 ];
 
 const sideItems = [
   { href: "/stores", label: "Stores", icon: "🏪" },
-  { href: "/compare", label: "Compare", icon: "⚖️" },
-  { href: "/history", label: "History", icon: "📋" },
+  { href: "/compare", label: "Compare Stores", icon: "⚖️" },
+  { href: "/history", label: "Price History", icon: "📋" },
 ];
 
 export default function BottomNav() {
@@ -43,7 +43,7 @@ export default function BottomNav() {
                 <span className={`text-xl leading-none transition-transform duration-150 ${isActive ? "scale-110" : ""}`}>
                   {item.icon}
                 </span>
-                <span className={isActive ? "font-semibold" : ""}>{item.label}</span>
+                <span className={isActive ? "font-semibold" : ""}>{item.short}</span>
               </Link>
             );
           })}

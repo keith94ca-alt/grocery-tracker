@@ -274,6 +274,9 @@ export default function HomePage() {
       ) : (
       <>
 
+      {/* Page description */}
+      <p className="text-xs text-gray-400 dark:text-gray-500 -mt-2">Track prices, spot flyer deals, and never overpay.</p>
+
       {/* Quick Actions */}
       <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
         <Link href="/add"

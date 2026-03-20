@@ -117,7 +117,7 @@ export default function HistoryPage() {
     return (
       <div className="px-4 py-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Price History</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Price History</h2>
           <div className="h-5 w-20 bg-gray-200 rounded animate-pulse" />
         </div>
         <div className="space-y-2">
@@ -143,7 +143,7 @@ export default function HistoryPage() {
     <div className="px-4 py-4 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Price History</h2>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Price History</h2>
         <div className="flex items-center gap-3">
           <a href="/api/export" className="text-xs text-brand-600 font-medium hover:underline">
             📥 CSV
@@ -183,6 +183,7 @@ export default function HistoryPage() {
           <span className="text-sm text-gray-500">{filtered.length} entries</span>
         </div>
       </div>
+      <p className="text-xs text-gray-400 dark:text-gray-500">Every price you've logged, sorted and searchable.</p>
 
       {/* Search */}
       <input

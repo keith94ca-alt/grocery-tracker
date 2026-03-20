@@ -275,6 +275,7 @@ function AddForm() {
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add Price Entry</h2>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Log what you paid so you can track price trends over time.</p>
         {recentItems.length > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500">{recentItems.length} recent items</span>
         )}
