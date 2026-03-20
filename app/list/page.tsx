@@ -57,8 +57,7 @@ export default function ShoppingListPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
-  // Load from API
-  useEffect(() => {
+  const loadShoppingList = useCallback(() => {
     fetch("/api/shopping-list")
       .then((r) => r.json())
       .then((data) => {
@@ -76,7 +75,10 @@ export default function ShoppingListPage() {
       })
       .catch(() => toast("Failed to load shopping list", "error"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [toast]);
+
+  // Load from API on mount
+  useEffect(() => { loadShoppingList(); }, [loadShoppingList]);
 
   const loadFlyerDeals = useCallback(() => {
     fetch("/api/flyer-deals")
@@ -91,6 +93,7 @@ export default function ShoppingListPage() {
   }, []);
 
   useRefreshOnFocus(loadFlyerDeals);
+  useRefreshOnFocus(loadShoppingList);
 
   // Load flyer deals and normal prices
   useEffect(() => {
