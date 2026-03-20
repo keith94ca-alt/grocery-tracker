@@ -95,18 +95,12 @@ export default function ShoppingListPage() {
   useRefreshOnFocus(loadFlyerDeals);
   useRefreshOnFocus(loadShoppingList);
 
-  // Load flyer deals and normal prices
-  useEffect(() => {
-    loadFlyerDeals();
-
-    fetch("/api/items")
+  const loadNormalPrices = useCallback((listItems: ShoppingListItem[]) => {
+    if (listItems.length === 0) return;
+    const names = listItems.map((i) => i.name);
+    fetch(`/api/normal-prices?names=${encodeURIComponent(names.join(","))}`)
       .then((r) => r.json())
-      .then(async (itemData) => {
-        if (!Array.isArray(itemData)) return;
-        const names = itemData.map((i: { name: string }) => i.name);
-        if (names.length === 0) return;
-        const res = await fetch(`/api/normal-prices?names=${encodeURIComponent(names.join(","))}`);
-        const normals: { itemName: string; price: number; unit: string; store: string }[] = await res.json();
+      .then((normals: { itemName: string; price: number; unit: string; store: string }[]) => {
         if (Array.isArray(normals)) {
           const map = new Map<string, { price: number; unit: string; store: string }>();
           normals.forEach((n) => { map.set(n.itemName.toLowerCase(), { price: n.price, unit: n.unit, store: n.store }); });
@@ -115,6 +109,16 @@ export default function ShoppingListPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Trigger initial flyer deal load on mount
+  useEffect(() => {
+    loadFlyerDeals();
+  }, [loadFlyerDeals]);
+
+  // Load normal prices whenever items list changes
+  useEffect(() => {
+    if (items.length > 0) loadNormalPrices(items);
+  }, [items, loadNormalPrices]);
 
   // Check flyer deals for untracked items
   useEffect(() => {
