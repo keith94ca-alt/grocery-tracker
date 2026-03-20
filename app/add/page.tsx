@@ -100,6 +100,8 @@ function AddForm() {
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
+  const [recentEntries, setRecentEntries] = useState<{ itemName: string; store: string; date: string }[]>([]);
   const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
 
   // Load recent items + last store from API
@@ -113,6 +115,13 @@ function AddForm() {
         if (data.length > 0 && !form.store) {
           setForm((prev) => ({ ...prev, store: data[0].store }));
         }
+
+        // Store raw entries for duplicate detection
+        setRecentEntries(data.map((e: { item: { name: string }; store: string; date: string }) => ({
+          itemName: e.item?.name ?? "",
+          store: e.store,
+          date: e.date,
+        })));
 
         const seen = new Set<string>();
         const items: { name: string; category: string; unit: string }[] = [];
@@ -197,6 +206,21 @@ function AddForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    setDupWarning(null);
+
+    // Check for duplicate entry within last 24 hours (non-blocking warning)
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const dup = recentEntries.find(
+      (r) =>
+        r.itemName.toLowerCase() === form.itemName.trim().toLowerCase() &&
+        r.store.toLowerCase() === form.store.trim().toLowerCase() &&
+        new Date(r.date).getTime() > cutoff
+    );
+    if (dup) {
+      setDupWarning(`You already logged ${form.itemName.trim()} at ${form.store.trim()} within the last 24 hours.`);
+      // Non-blocking — continue to submit
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/prices", {
@@ -212,6 +236,7 @@ function AddForm() {
       }
       saveRecentItem(form.itemName, form.category, form.unit);
       toast(`Saved ${form.itemName} at $${parseFloat(form.price).toFixed(2)}`);
+      setDupWarning(null);
       setForm((prev) => ({
         itemName: "",
         category: "Other",
@@ -258,6 +283,13 @@ function AddForm() {
       {error && (
         <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-3 text-red-700 dark:text-red-400 text-sm animate-shake">
           ⚠️ {error}
+        </div>
+      )}
+
+      {dupWarning && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-sm flex items-start gap-2">
+          <span>⚠️</span>
+          <span>{dupWarning}</span>
         </div>
       )}
 
