@@ -9,6 +9,7 @@ import type { FlippItem } from "@/lib/flipp";
 import PriceChart from "@/components/PriceChart";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
 
 interface PriceEntry {
   id: number;
@@ -811,7 +812,23 @@ export default function ItemPage() {
       </div>
 
       {/* All Flyer Deals Modal */}
-      {showDealsModal && <AllDealsModal deals={allDeals} onClose={() => setShowDealsModal(false)} />}
+      {showDealsModal && (
+        <FlyerDealsModal
+          itemName={item.name}
+          deals={allDeals.map((d: FlippItem): FlyerDealEntry => ({
+            id: d.id,
+            name: d.name,
+            currentPrice: d.currentPrice,
+            merchantName: d.merchantName,
+            unitPrice: d.unitPrice,
+            unit: d.unit,
+            saleStory: d.saleStory,
+            validTo: d.validTo,
+            imageUrl: d.imageUrl,
+          }))}
+          onClose={() => setShowDealsModal(false)}
+        />
+      )}
 
       {/* Confirm delete price entry */}
       {confirmDeleteEntry && (
