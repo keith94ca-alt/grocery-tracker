@@ -14,6 +14,11 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 
 const CATEGORIES = ["Meat", "Dairy & Eggs", "Produce", "Pantry", "Bakery", "Beverages", "Other"];
 
+interface FlyerBrowseItemWithNormal extends FlyerBrowseItem {
+  normalUnitPrice?: number | null;
+  normalUnit?: string | null;
+}
+
 // ── Image lightbox ─────────────────────────────────────────────────────────────
 
 function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
@@ -420,13 +425,18 @@ function FlyerCard({
   onAction,
   onDismiss,
 }: {
-  item: FlyerBrowseItem;
+  item: FlyerBrowseItemWithNormal;
   added: boolean;
   onAction: () => void;
   onDismiss?: () => void;
 }) {
-  const { flippItem, trackedMatch } = item;
+  const { flippItem, trackedMatch, normalUnitPrice, normalUnit } = item;
   const unitLabel = flippItem.unit?.replace("per ", "");
+  // Green/grey comparison colouring for best deals tab
+  const canCompare = flippItem.unitPrice !== null && normalUnitPrice != null && flippItem.unit === normalUnit;
+  const flyerCheaper = canCompare ? flippItem.unitPrice! < normalUnitPrice! : null;
+  const flyerPriceColor = flyerCheaper === true ? "text-green-700" : flyerCheaper === false ? "text-gray-400" : "text-gray-900";
+  const normalPriceColor = flyerCheaper === false ? "text-green-700" : "text-gray-400";
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   return (
@@ -471,12 +481,15 @@ function FlyerCard({
       </div>
 
       <div className="shrink-0 text-right">
-        <p className="text-base font-bold text-gray-900">${flippItem.currentPrice.toFixed(2)}</p>
+        <p className={`text-base font-bold ${flyerPriceColor}`}>${flippItem.currentPrice.toFixed(2)}</p>
         {flippItem.unitPrice && unitLabel && (
-          <p className="text-xs text-gray-500">${flippItem.unitPrice.toFixed(2)}/{unitLabel}</p>
+          <p className={`text-xs ${flyerPriceColor}`}>${flippItem.unitPrice.toFixed(2)}/{unitLabel}</p>
         )}
         {!flippItem.unitPrice && flippItem.postPriceText && (
           <p className="text-xs text-gray-500">${flippItem.currentPrice.toFixed(2)}/{flippItem.postPriceText.replace(/^\/?\s*/, "").toLowerCase()}</p>
+        )}
+        {normalUnitPrice && normalUnit && (
+          <p className={`text-xs mt-0.5 ${normalPriceColor}`}>Normal: ${normalUnitPrice.toFixed(2)}/{normalUnit.replace("per ", "")}</p>
         )}
         {added ? (
           <span className="mt-2 inline-block text-xs text-green-600 font-semibold">✓ Added</span>
@@ -597,12 +610,15 @@ function FlyerPageContent() {
 
   // Deals tab: only show deals where flyer price is cheaper than normal
   const cheaperDeals = deals.filter((d) => d.isCheaper);
-  const dealFlyerItems: FlyerBrowseItem[] = cheaperDeals.map((deal) => ({
+  const dealFlyerItems: FlyerBrowseItemWithNormal[] = cheaperDeals.map((deal) => ({
     flippItem: deal.bestDeal,
     trackedMatch: { id: deal.itemId, name: deal.itemName, unit: deal.flyerUnit || "each", category: "Other", recentlyLogged: false },
+    normalUnitPrice: deal.normalUnitPrice,
+    normalUnit: deal.normalUnit,
   }));
 
-  const displayed = (tab === "deals" ? dealFlyerItems : tab === "new" ? newItems : trackedItems).filter((i) => {
+  const displayed = (tab === "deals" ? dealFlyerItems : tab === "new" ? newItems : trackedItems) as FlyerBrowseItemWithNormal[];
+  const displayedFiltered = displayed.filter((i) => {
     // Hide if already added this session
     if (added.has(i.flippItem.id)) return false;
     // Hide if dismissed for this tracked item
@@ -751,7 +767,7 @@ function FlyerPageContent() {
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => <FlyerCardSkeleton key={i} />)}
         </div>
-      ) : displayed.length === 0 ? (
+      ) : displayedFiltered.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <p className="text-4xl mb-2">🔍</p>
           <p className="text-sm">
@@ -764,7 +780,7 @@ function FlyerPageContent() {
         </div>
       ) : (
         <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 pb-4">
-          {displayed.map((item) => (
+          {displayedFiltered.map((item) => (
             <FlyerCard
               key={item.flippItem.id}
               item={item}
