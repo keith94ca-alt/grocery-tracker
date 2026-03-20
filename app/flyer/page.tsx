@@ -668,7 +668,7 @@ function FlyerPageContent() {
       if (dismissedSet && dismissedSet.has(i.flippItem.id)) return false;
     }
     const matchesStore = selectedStores.size === 0 || selectedStores.has(i.flippItem.merchantName);
-    const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(getFlyerCategory(i.flippItem.name));
+    const matchesCategory = selectedCategories.size === 0 || selectedCategories.has(deriveFlyerCategory(i.flippItem.name));
     const matchesFilter =
       !filter ||
       i.flippItem.name.toLowerCase().includes(filter.toLowerCase()) ||
@@ -755,7 +755,7 @@ function FlyerPageContent() {
       {/* Filter button */}
       {(() => {
         const activeCount = selectedStores.size + selectedCategories.size;
-        const availableCategories = [...new Set(newItems.map((i) => getFlyerCategory(i.flippItem.name)))].sort();
+        const availableCategories = [...new Set(newItems.map((i) => deriveFlyerCategory(i.flippItem.name)))].sort();
         return (
           <>
             <div className="flex items-center gap-2">
