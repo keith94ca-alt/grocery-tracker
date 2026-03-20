@@ -67,6 +67,12 @@ const FLYER_CATEGORIES = [
   "body wash", "shampoo", "conditioner", "deodorant", "toothpaste",
   // Household & cleaning
   "laundry detergent", "dish soap", "toilet paper", "paper towel", "bleach",
+  // Additional dairy & fridge
+  "cream", "cream cheese", "sour cream",
+  // Frozen & snacks
+  "frozen meals", "chips",
+  // Beverages
+  "pop", "sparkling water",
 ];
 
 export interface FlippItem {
