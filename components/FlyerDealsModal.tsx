@@ -35,6 +35,27 @@ function getExpiryBadge(validTo: string | null): string | null {
 
 export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [addedToList, setAddedToList] = useState<Set<number>>(new Set());
+  const [addingToList, setAddingToList] = useState<Set<number>>(new Set());
+
+  async function addToShoppingList(d: FlyerDealEntry, idx: number) {
+    const key = d.id ?? idx;
+    setAddingToList((prev) => new Set(prev).add(key));
+    try {
+      const res = await fetch("/api/shopping-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: itemName, category: "Other" }),
+      });
+      if (res.ok) {
+        setAddedToList((prev) => new Set(prev).add(key));
+      }
+    } catch {
+      // Silently ignore
+    } finally {
+      setAddingToList((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    }
+  }
 
   return (
     <>
@@ -66,8 +87,11 @@ export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
           <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
             {deals.map((d, i) => {
               const expiryBadge = getExpiryBadge(d.validTo);
+              const key = d.id ?? i;
+              const isAdded = addedToList.has(key);
+              const isAdding = addingToList.has(key);
               return (
-              <div key={d.id ?? i} className="bg-gray-50 rounded-xl p-3 flex gap-3 items-start">
+              <div key={key} className="bg-gray-50 rounded-xl p-3 flex gap-3 items-start">
                 {d.imageUrl ? (
                   <img
                     src={d.imageUrl}
@@ -90,10 +114,23 @@ export default function FlyerDealsModal({ itemName, deals, onClose }: Props) {
                       </span>
                     )}
                   </div>
-                  <div className="mt-1.5">
-                    <span className="text-lg font-bold text-green-700">${d.currentPrice.toFixed(2)}</span>
-                    {d.unitPrice && d.unit && (
-                      <span className="text-xs text-gray-500 ml-1">(${d.unitPrice.toFixed(2)}/{d.unit.replace("per ", "")})</span>
+                  <div className="mt-1.5 flex items-center gap-3">
+                    <div>
+                      <span className="text-lg font-bold text-green-700">${d.currentPrice.toFixed(2)}</span>
+                      {d.unitPrice && d.unit && (
+                        <span className="text-xs text-gray-500 ml-1">(${d.unitPrice.toFixed(2)}/{d.unit.replace("per ", "")})</span>
+                      )}
+                    </div>
+                    {isAdded ? (
+                      <span className="text-xs text-green-600 font-semibold">✓ Added to list</span>
+                    ) : (
+                      <button
+                        onClick={() => addToShoppingList(d, i)}
+                        disabled={isAdding}
+                        className="text-xs px-2 py-1 bg-brand-50 text-brand-700 rounded-lg font-medium hover:bg-brand-100 transition-colors disabled:opacity-50"
+                      >
+                        {isAdding ? "Adding…" : "🛒 Add to list"}
+                      </button>
                     )}
                   </div>
                 </div>
