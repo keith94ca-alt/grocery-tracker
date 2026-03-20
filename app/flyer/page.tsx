@@ -720,7 +720,7 @@ function FlyerPageContent() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">🏷️ This Week&apos;s Flyers</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Ontario grocery chains · Refreshes every Thursday
+            Browse this week&apos;s deals and match them against your tracked items.
           </p>
         </div>
         <button
@@ -753,130 +753,90 @@ function FlyerPageContent() {
       />
 
       {/* Filter button */}
+      {/* Filter panel */}
       {(() => {
         const activeCount = selectedStores.size + selectedCategories.size;
         const availableCategories = [...new Set(newItems.map((i) => deriveFlyerCategory(i.flippItem.name)))].sort();
         return (
-          <>
+          <div className="space-y-2">
+            {/* Toggle row */}
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowFilterSheet(true)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${
+                onClick={() => setShowFilterSheet((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                   activeCount > 0
                     ? "bg-brand-600 text-white border-brand-600"
-                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-brand-400"
                 }`}
               >
-                <span>⚙️ Filter</span>
+                <span>{showFilterSheet ? "▴" : "▾"} Filter</span>
                 {activeCount > 0 && (
-                  <span className="bg-white text-brand-600 rounded-full text-xs font-bold w-4 h-4 flex items-center justify-center leading-none">
-                    {activeCount}
-                  </span>
+                  <span className="bg-white/30 rounded-full px-1.5 font-bold">{activeCount}</span>
                 )}
               </button>
               {activeCount > 0 && (
                 <button
                   onClick={() => { setSelectedStores(new Set()); setSelectedCategories(new Set()); }}
-                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-xs text-red-400 hover:text-red-600 transition-colors"
                 >
-                  Clear
+                  Clear all
                 </button>
-              )}
-              {activeCount > 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {selectedStores.size > 0 && `${selectedStores.size} store${selectedStores.size !== 1 ? "s" : ""}`}
-                  {selectedStores.size > 0 && selectedCategories.size > 0 && " · "}
-                  {selectedCategories.size > 0 && `${selectedCategories.size} categor${selectedCategories.size !== 1 ? "ies" : "y"}`}
-                </p>
               )}
             </div>
 
-            {/* Filter bottom sheet */}
+            {/* Expandable filter panel */}
             {showFilterSheet && (
-              <>
-                <div className="fixed inset-0 bg-black/40 z-[60]" onClick={() => setShowFilterSheet(false)} />
-                <div className="fixed inset-x-0 bottom-0 z-[70] bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl max-h-[80vh] flex flex-col">
-                  <div className="px-5 pt-4 pb-2 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white">Filter Flyers</h3>
-                    <div className="flex items-center gap-3">
-                      {(selectedStores.size + selectedCategories.size) > 0 && (
-                        <button
-                          onClick={() => { setSelectedStores(new Set()); setSelectedCategories(new Set()); }}
-                          className="text-xs text-red-500 font-medium"
-                        >
-                          Clear all
-                        </button>
-                      )}
-                      <button onClick={() => setShowFilterSheet(false)} className="text-gray-400 text-xl leading-none">×</button>
-                    </div>
-                  </div>
-                  <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
-                    {/* Stores */}
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Stores</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {stores.filter((s) => s !== "All").map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => setSelectedStores((prev) => {
-                              const next = new Set(prev);
-                              next.has(s) ? next.delete(s) : next.add(s);
-                              return next;
-                            })}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors text-left ${
-                              selectedStores.has(s)
-                                ? "bg-brand-600 text-white border-brand-600"
-                                : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
-                            }`}
-                          >
-                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedStores.has(s) ? "bg-white border-white" : "border-gray-400"}`}>
-                              {selectedStores.has(s) && <span className="text-brand-600 text-xs leading-none">✓</span>}
-                            </span>
-                            <span className="truncate text-xs font-medium">{s}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Categories */}
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Categories</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {availableCategories.map((cat) => (
-                          <button
-                            key={cat}
-                            onClick={() => setSelectedCategories((prev) => {
-                              const next = new Set(prev);
-                              next.has(cat) ? next.delete(cat) : next.add(cat);
-                              return next;
-                            })}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm border transition-colors text-left ${
-                              selectedCategories.has(cat)
-                                ? "bg-brand-600 text-white border-brand-600"
-                                : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
-                            }`}
-                          >
-                            <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${selectedCategories.has(cat) ? "bg-white border-white" : "border-gray-400"}`}>
-                              {selectedCategories.has(cat) && <span className="text-brand-600 text-xs leading-none">✓</span>}
-                            </span>
-                            <span className="truncate text-xs font-medium">{cat}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="px-5 py-4 border-t border-gray-100 dark:border-gray-800">
-                    <button
-                      onClick={() => setShowFilterSheet(false)}
-                      className="w-full py-3 bg-brand-600 text-white rounded-xl text-sm font-semibold"
-                    >
-                      Apply
-                    </button>
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-3 space-y-3 border border-gray-200 dark:border-gray-700">
+                {/* Stores */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Stores</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {stores.filter((s) => s !== "All").map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setSelectedStores((prev) => {
+                          const next = new Set(prev);
+                          next.has(s) ? next.delete(s) : next.add(s);
+                          return next;
+                        })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          selectedStores.has(s)
+                            ? "bg-brand-600 text-white"
+                            : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-brand-400"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </>
+
+                {/* Categories */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Categories</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableCategories.map((cat) => (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategories((prev) => {
+                          const next = new Set(prev);
+                          next.has(cat) ? next.delete(cat) : next.add(cat);
+                          return next;
+                        })}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          selectedCategories.has(cat)
+                            ? "bg-brand-600 text-white"
+                            : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:border-brand-400"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
-          </>
+          </div>
         );
       })()}
 

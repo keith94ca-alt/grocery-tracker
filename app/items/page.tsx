@@ -394,7 +394,7 @@ export default function ItemsPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="text-gray-400 hover:text-gray-600 text-xl leading-none">←</Link>
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             My Items
             {!loading && (
               <span className="ml-2 text-sm font-normal text-gray-400">({items.length})</span>
@@ -406,6 +406,7 @@ export default function ItemsPage() {
           ⭐ Watch
         </button>
       </div>
+      <p className="text-xs text-gray-400 dark:text-gray-500">All your tracked groceries with latest prices and flyer deals.</p>
 
       {/* Search */}
       <div className="relative">
@@ -572,7 +573,11 @@ function ItemRow({
                   <button
                     onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
                     className={`text-xs font-medium hover:underline active:opacity-70 ${flyerColor}`}>
-                    🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                    🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)}
+                    {flyerDeal.flyerUnitPrice && flyerDeal.flyerUnit && (
+                      <span className="opacity-70"> (${flyerDeal.flyerUnitPrice.toFixed(2)}/{flyerDeal.flyerUnit.replace("per ", "")})</span>
+                    )}
+                    {" "}at {flyerDeal.bestDeal.merchantName}
                     {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
                   </button>
                 )}
@@ -587,7 +592,11 @@ function ItemRow({
                 <button
                   onClick={(e) => { e.preventDefault(); onFlyerClick(flyerDeal); }}
                   className="text-xs text-green-600 font-medium hover:underline active:opacity-70">
-                  🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)} at {flyerDeal.bestDeal.merchantName}
+                  🏷️ ${flyerDeal.bestDeal.currentPrice.toFixed(2)}
+                  {flyerDeal.flyerUnitPrice && flyerDeal.flyerUnit && (
+                    <span className="opacity-70"> (${flyerDeal.flyerUnitPrice.toFixed(2)}/{flyerDeal.flyerUnit.replace("per ", "")})</span>
+                  )}
+                  {" "}at {flyerDeal.bestDeal.merchantName}
                   {flyerDeal.allDeals.length > 1 && <span className="text-gray-400 ml-1">+{flyerDeal.allDeals.length - 1} more</span>}
                 </button>
               )}

@@ -137,7 +137,10 @@ export default function ComparePage() {
     <div className="px-4 py-4 space-y-4 pb-24">
       <div className="flex items-center gap-2">
         <Link href="/" className="text-gray-400 hover:text-gray-600 text-xl leading-none">←</Link>
-        <h1 className="text-xl font-bold text-gray-900">🏪 Store Comparison</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">🏪 Store Comparison</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">See which store gives you the best basket price.</p>
+        </div>
       </div>
 
       <p className="text-sm text-gray-500">

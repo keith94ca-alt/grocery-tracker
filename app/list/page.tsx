@@ -453,7 +453,7 @@ export default function ShoppingListPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Link href="/" className="text-gray-400 hover:text-gray-600 text-xl leading-none">←</Link>
-          <h1 className="text-xl font-bold text-gray-900">🛒 Shopping List</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">🛒 Shopping List</h1>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/history" className="text-xs text-brand-600 font-medium">History →</Link>
@@ -471,8 +471,10 @@ export default function ShoppingListPage() {
         </div>
       </div>
 
+      <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">Plan your shop and compare prices before you head out.</p>
+
       {/* Add form */}
-      <div className="bg-white rounded-xl border border-gray-200 p-3 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
         <div className="flex gap-2">
           <div className="flex-1 relative">
             <input
