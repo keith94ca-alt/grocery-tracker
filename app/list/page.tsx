@@ -346,6 +346,59 @@ export default function ShoppingListPage() {
     return normalPrices.get(itemName.toLowerCase());
   }
 
+  // Compute best store this week
+  const bestStoreBanner = (() => {
+    const unchecked = items.filter((i) => !i.checked);
+    if (unchecked.length === 0) return null;
+
+    // Build a map: store → { count, totalPrice }
+    const storeMap = new Map<string, { count: number; totalPrice: number; itemNames: string[] }>();
+
+    for (const item of unchecked) {
+      const lower = item.name.toLowerCase();
+      // Check tracked flyer deals
+      const deal = flyerDeals.get(lower) ?? (() => {
+        for (const [key, d] of flyerDeals) {
+          if (lower.includes(key) || key.includes(lower)) return d;
+        }
+        return undefined;
+      })();
+
+      if (deal) {
+        const store = deal.bestDeal.merchantName;
+        const price = deal.bestDeal.currentPrice;
+        const entry = storeMap.get(store) ?? { count: 0, totalPrice: 0, itemNames: [] };
+        entry.count++;
+        entry.totalPrice += price;
+        entry.itemNames.push(item.name);
+        storeMap.set(store, entry);
+      } else {
+        // Check untracked flyer deals
+        const untracked = untrackedFlyerDeals.get(lower);
+        if (untracked && untracked.length > 0) {
+          const best = untracked[0];
+          const store = best.merchantName;
+          const price = best.currentPrice;
+          const entry = storeMap.get(store) ?? { count: 0, totalPrice: 0, itemNames: [] };
+          entry.count++;
+          entry.totalPrice += price;
+          entry.itemNames.push(item.name);
+          storeMap.set(store, entry);
+        }
+      }
+    }
+
+    if (storeMap.size === 0) return null;
+
+    // Pick store with highest item count (tie-break: lowest total price)
+    const best = Array.from(storeMap.entries()).sort((a, b) => {
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count;
+      return a[1].totalPrice - b[1].totalPrice;
+    })[0];
+
+    return { store: best[0], count: best[1].count, totalPrice: best[1].totalPrice };
+  })();
+
   const sorted = [...items].sort((a, b) => {
     if (a.checked !== b.checked) return a.checked ? 1 : -1;
     if (a.category !== b.category) return a.category.localeCompare(b.category);
@@ -453,6 +506,19 @@ export default function ShoppingListPage() {
             className="text-xs text-gray-400 hover:text-red-500 font-medium transition-colors">
             Clear all
           </button>
+        </div>
+      )}
+
+      {/* Best store banner */}
+      {bestStoreBanner && bestStoreBanner.count >= 2 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <span className="text-lg">🏪</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-blue-900">
+              {bestStoreBanner.store} has deals on {bestStoreBanner.count} item{bestStoreBanner.count !== 1 ? "s" : ""} this week
+            </p>
+            <p className="text-xs text-blue-600">~${bestStoreBanner.totalPrice.toFixed(2)} combined</p>
+          </div>
         </div>
       )}
 
