@@ -29,6 +29,14 @@ ENV PORT=7800
 ENV HOSTNAME="0.0.0.0"
 ENV DATABASE_URL="file:/data/prices.db"
 
+# Auth secret — MUST be overridden in production via Portainer env vars
+# ENV JWT_SECRET="change-me-in-production"
+
+# Optional first-boot seed — creates admin user + backfills existing data to a family
+# ENV SEED_EMAIL="your@email.com"
+# ENV SEED_PASSWORD="yourpassword"
+# ENV SEED_NAME="Your Name"
+
 # Copy all necessary files from builder
 COPY --from=builder /app/package.json /app/package-lock.json* ./
 COPY --from=builder /app/.next ./.next
