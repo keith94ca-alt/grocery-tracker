@@ -1,26 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getFamilyId } from "@/lib/auth";
 
-export async function GET(request: NextRequest) {
-  const familyId = getFamilyId(request);
-
+export async function GET() {
   try {
-    const [items, stores, shoppingList, dismissed] = await Promise.all([
-      prisma.item.findMany({
-        where: { familyId },
-        include: {
-          priceEntries: { orderBy: { date: "desc" } },
-          flyerNotes: true,
+    const items = await prisma.item.findMany({
+      include: {
+        priceEntries: {
+          orderBy: { date: "desc" },
         },
-      }),
-      prisma.store.findMany({ where: { familyId } }),
-      prisma.shoppingListItem.findMany({ where: { familyId } }),
-      prisma.dismissedFlyerMatch.findMany({ where: { familyId } }),
-    ]);
+        flyerNotes: true,
+      },
+    });
+
+    const stores = await prisma.store.findMany();
+    const shoppingList = await prisma.shoppingListItem.findMany();
+    const dismissed = await prisma.flyerDismissed.findMany();
 
     const data = {
-      version: 2,
+      version: 1,
       exportedAt: new Date().toISOString(),
       items,
       stores,
