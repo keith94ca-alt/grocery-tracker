@@ -60,9 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.fetch = async (...args) => {
       const res = await originalFetch(...args);
       if (res.status === 401) {
-        const url = typeof args[0] === "string" ? args[0] : args[0] instanceof URL ? args[0].toString() : "";
-        // Only act on our own API calls, not the /api/auth/* endpoints
-        if (url.startsWith("/api/") && !url.startsWith("/api/auth/")) {
+        const rawUrl = typeof args[0] === "string" ? args[0] : args[0] instanceof URL ? args[0].toString() : args[0] instanceof Request ? args[0].url : "";
+        // Normalise to pathname only so both relative and absolute URLs are handled
+        let urlPath = rawUrl;
+        try { urlPath = new URL(rawUrl, window.location.origin).pathname; } catch { /* already a path */ }
+        // Only redirect on our own protected API calls, not auth endpoints
+        if (urlPath.startsWith("/api/") && !urlPath.startsWith("/api/auth/")) {
           setUser(null);
           window.location.href = "/login";
         }
