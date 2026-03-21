@@ -8,26 +8,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  avatar       String?
+  familyId     String?
+  role         String    @default("member") // "admin" | "member"
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  family       Family?   @relation(fields: [familyId], references: [id])
+
+  // Personal preferences (JSON blobs)
+  targetPrices String?   // JSON: { itemId: targetPrice }
+  watchlist    String?   // JSON: [itemId, ...]
+}
+
+model Family {
+  id              String    @id @default(cuid())
+  name            String
+  adminId         String
+  inviteCode      String    @unique @default(cuid())
+  inviteExpiresAt DateTime?
+  maxMembers      Int       @default(10)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+
+  members         User[]
+}
+
 model Item {
   id           Int          @id @default(autoincrement())
-  name         String       @unique
+  name         String
   category     String       @default("Other")
   unit         String       @default("each")
   watched      Boolean      @default(false)
-  targetPrice      Float?       // User's target price for this item (optional)
+  targetPrice      Float?
+  familyId         String?
   createdAt        DateTime     @default(now())
   priceEntries     PriceEntry[]
   flyerNotes       FlyerNote[]
   shoppingListItems ShoppingListItem[]
+
+  @@unique([name, familyId])
 }
 
 model Store {
   id           Int          @id @default(autoincrement())
-  name         String       @unique
+  name         String
   location     String?
   type         String       @default("grocery")
+  familyId     String?
   createdAt    DateTime     @default(now())
   priceEntries PriceEntry[]
+
+  @@unique([name, familyId])
 }
 
 model PriceEntry {
@@ -43,6 +80,8 @@ model PriceEntry {
   priceType String   @default("normal") // "normal" or "sale"
   date      DateTime
   notes     String?
+  familyId  String?
+  userId    String?
   createdAt DateTime @default(now())
 
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -59,6 +98,7 @@ model FlyerNote {
   store     String
   validFrom String
   validTo   String
+  familyId  String?
   createdAt DateTime @default(now())
 
   item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
@@ -73,6 +113,8 @@ model ShoppingListItem {
   price      Float?
   itemId     Int?     // FK to Item if tracked
   sortOrder  Int      @default(0)
+  familyId   String?
+  userId     String?
   createdAt  DateTime @default(now())
 
   item       Item?    @relation(fields: [itemId], references: [id])
@@ -82,6 +124,7 @@ model DismissedFlyerMatch {
   id            Int      @id @default(autoincrement())
   trackedItemId Int
   flippId       Int
+  familyId      String?
   createdAt     DateTime @default(now())
 
   @@unique([trackedItemId, flippId])
