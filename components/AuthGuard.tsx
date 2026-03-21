@@ -22,7 +22,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, pathname, router]);
 
-  if (loading) {
+  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+  // Show spinner while loading, or while redirect is pending (prevents flash of protected content)
+  if (loading || (!user && !isPublic) || (user && isPublic)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
