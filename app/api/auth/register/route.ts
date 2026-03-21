@@ -31,15 +31,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
+    // Bootstrap check first (cheap count query)
+    const userCount = await prisma.user.count();
+    const isFirstUser = userCount === 0;
+
     // Check if email already exists
     const existing = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (existing) {
       return NextResponse.json({ error: "Email already in use" }, { status: 409 });
     }
-
-    // Bootstrap check: is this the first user?
-    const userCount = await prisma.user.count();
-    const isFirstUser = userCount === 0;
 
     let familyId: string | null = null;
     let role = "member";
