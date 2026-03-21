@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getFamilyId } from "@/lib/auth";
 
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024; // 5MB
+
 export async function POST(request: NextRequest) {
   const familyId = getFamilyId(request);
+
+  // Reject oversized uploads before reading the body
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && parseInt(contentLength) > MAX_IMPORT_BYTES) {
+    return NextResponse.json({ error: "File too large. Maximum import size is 5MB." }, { status: 413 });
+  }
 
   try {
     const contentType = request.headers.get("content-type") || "";
