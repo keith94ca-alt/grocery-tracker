@@ -8,8 +8,8 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 COPY . .
 
-# Install dependencies
-RUN npm install
+# Install dependencies (--include=dev ensures TypeScript + Prisma CLI are available for build)
+RUN npm ci --include=dev
 
 # Generate Prisma client
 RUN npx prisma generate
