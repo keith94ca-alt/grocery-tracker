@@ -2,12 +2,14 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  if (process.env.NODE_ENV === "production") {
+const JWT_SECRET_VALUE = process.env.JWT_SECRET || "dev-secret-change-in-production";
+
+function getJwtSecret(): string {
+  if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
     throw new Error("JWT_SECRET environment variable is required in production. Set it in Portainer.");
   }
-  return "dev-secret-change-in-production";
-})();
+  return JWT_SECRET_VALUE;
+}
 const COOKIE_NAME = "gt_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -30,12 +32,12 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 // JWT
 export function signToken(payload: SessionPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
 }
 
 export function verifyToken(token: string): SessionPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as SessionPayload;
+    return jwt.verify(token, getJwtSecret()) as SessionPayload;
   } catch {
     return null;
   }
