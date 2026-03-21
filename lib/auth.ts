@@ -2,7 +2,12 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET environment variable is required in production. Set it in Portainer.");
+  }
+  return "dev-secret-change-in-production";
+})();
 const COOKIE_NAME = "gt_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
