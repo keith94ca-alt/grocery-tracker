@@ -11,16 +11,21 @@ const store = new Map<string, RateLimitEntry>();
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_REQUESTS = 10; // per window
 
-function getIP(request: Request): string {
+function getIP(request: Request): string | null {
   return (
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
-    "unknown"
+    null
   );
 }
 
 export function checkRateLimit(request: Request): { allowed: boolean; retryAfterMs: number } {
   const ip = getIP(request);
+
+  // Block requests where IP cannot be determined rather than sharing a bucket
+  if (!ip) {
+    return { allowed: false, retryAfterMs: WINDOW_MS };
+  }
   const now = Date.now();
 
   let entry = store.get(ip);
