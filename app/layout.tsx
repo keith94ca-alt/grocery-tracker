@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientLayout from "@/components/ClientLayout";
-import FAB from "@/components/FAB";
-import DarkModeToggle from "@/components/DarkModeToggle";
-import UserMenu from "@/components/UserMenu";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -37,25 +34,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body style={{ fontFamily: "system-ui, -apple-system, sans-serif" }}>
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-20 lg:pb-0">
-          <header className="bg-brand-600 dark:bg-brand-800 text-white sticky top-0 z-40 shadow-md">
-            <div className="max-w-2xl lg:max-w-none mx-auto lg:ml-56 px-4 py-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🛒</span>
-                <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <DarkModeToggle />
-                <UserMenu />
-              </div>
-            </div>
-          </header>
-          <main className="max-w-2xl lg:max-w-none mx-auto px-1 lg:px-6 lg:ml-56">
-            <ClientLayout>{children}</ClientLayout>
-          </main>
-        </div>
-        <BottomNav />
-        <FAB />
+        <ClientLayout>
+          <AppShell>{children}</AppShell>
+        </ClientLayout>
         <ServiceWorkerRegistrar />
       </body>
     </html>
