@@ -21,6 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Family not found" }, { status: 404 });
     }
 
+    // If last member leaving, soft-delete the family so data isn't orphaned with active status
+    if (family.members.length === 1) {
+      await prisma.family.update({
+        where: { id: session.familyId },
+        data: { isActive: false },
+      });
+      await prisma.user.update({
+        where: { id: session.userId },
+        data: { familyId: null, role: "member" },
+      });
+      const user = await prisma.user.findUnique({ where: { id: session.userId } });
+      if (user) {
+        await setSessionCookie({ userId: user.id, familyId: null, role: "member", name: user.name, email: user.email });
+      }
+      return NextResponse.json({ success: true });
+    }
+
     // Admin must transfer role first if other members exist
     if (session.role === "admin" && family.members.length > 1) {
       const body = await request.json().catch(() => ({}));
