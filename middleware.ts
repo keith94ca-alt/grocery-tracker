@@ -27,9 +27,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Pass userId and familyId as headers so route handlers can read them
-  // without re-parsing the JWT
+  // Strip any client-supplied spoofed session headers, then inject validated values
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete("x-user-id");
+  requestHeaders.delete("x-family-id");
+  requestHeaders.delete("x-user-role");
   requestHeaders.set("x-user-id", session.userId);
   requestHeaders.set("x-family-id", session.familyId ?? "");
   requestHeaders.set("x-user-role", session.role);
