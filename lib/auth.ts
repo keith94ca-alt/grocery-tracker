@@ -84,6 +84,16 @@ export function getSessionFromHeaders(request: Request): SessionPayload | null {
   return { userId, familyId, role, name: "", email: "" };
 }
 
+// Convenience helpers for route handlers (read from middleware-injected headers)
+export function getFamilyId(request: Request): string | null {
+  const id = request.headers.get("x-family-id");
+  return id && id.length > 0 ? id : null;
+}
+
+export function getUserId(request: Request): string | null {
+  return request.headers.get("x-user-id") || null;
+}
+
 // Personal prefs helpers
 export function parseWatchlist(raw: string | null): number[] {
   try {

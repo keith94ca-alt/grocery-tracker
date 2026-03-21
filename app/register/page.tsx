@@ -1,33 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/authContext";
-import { Suspense } from "react";
 
-function RegisterForm() {
+export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { refresh } = useAuth();
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState(searchParams.get("invite") || "");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
     setLoading(true);
+
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -56,7 +48,7 @@ function RegisterForm() {
         <div className="text-center mb-8">
           <span className="text-5xl">🛒</span>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-3">Create Account</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Join Grocery Price Tracker</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Join or start a family group</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
@@ -99,8 +91,8 @@ function RegisterForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="new-password"
               minLength={8}
+              autoComplete="new-password"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               placeholder="Min. 8 characters"
             />
@@ -108,15 +100,14 @@ function RegisterForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Invite Code <span className="text-gray-400 font-normal">(required to join a family)</span>
+              Invite Code <span className="text-gray-400 font-normal">(required unless first user)</span>
             </label>
             <input
               type="text"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value)}
-              autoComplete="off"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-              placeholder="Leave empty if you're the first user"
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             />
           </div>
 
@@ -137,13 +128,5 @@ function RegisterForm() {
         </p>
       </div>
     </div>
-  );
-}
-
-export default function RegisterPage() {
-  return (
-    <Suspense>
-      <RegisterForm />
-    </Suspense>
   );
 }

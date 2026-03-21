@@ -2,63 +2,48 @@
 
 import { useState } from "react";
 import { useAuth } from "@/lib/authContext";
-import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 export default function FamilyPage() {
   const { user, refresh } = useAuth();
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Join family form
+  const { toast: showToast } = useToast();
   const [joinCode, setJoinCode] = useState("");
-  const [joining, setJoining] = useState(false);
-
-  // Create family form
   const [newFamilyName, setNewFamilyName] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [transferTo, setTransferTo] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   if (!user) return null;
 
-  const isAdmin = user.role === "admin" && user.family?.adminId === user.id;
+  const isAdmin = user.role === "admin";
+  const family = user.family;
 
   async function regenerateInvite() {
     setLoading(true);
-    setMessage(null);
     try {
       const res = await fetch("/api/family/invite", { method: "POST" });
       if (res.ok) {
         await refresh();
-        setMessage({ type: "success", text: "Invite code regenerated." });
+        showToast("New invite code generated", "success");
       } else {
         const d = await res.json();
-        setMessage({ type: "error", text: d.error });
+        showToast(d.error || "Failed", "error");
       }
     } finally {
       setLoading(false);
     }
   }
 
-  async function removeMember(memberId: string) {
-    if (!confirm("Remove this member? Their data stays with the family.")) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/family/members?userId=${memberId}`, { method: "DELETE" });
-      if (res.ok) {
-        await refresh();
-        setMessage({ type: "success", text: "Member removed." });
-      } else {
-        const d = await res.json();
-        setMessage({ type: "error", text: d.error });
-      }
-    } finally {
-      setLoading(false);
-    }
+  async function copyInviteCode() {
+    if (!family?.inviteCode) return;
+    await navigator.clipboard.writeText(family.inviteCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   }
 
-  async function handleJoin(e: React.FormEvent) {
+  async function joinFamily(e: React.FormEvent) {
     e.preventDefault();
-    setJoining(true);
-    setMessage(null);
+    setLoading(true);
     try {
       const res = await fetch("/api/family/join", {
         method: "POST",
@@ -69,19 +54,19 @@ export default function FamilyPage() {
       if (res.ok) {
         await refresh();
         setJoinCode("");
-        setMessage({ type: "success", text: `Joined ${d.name}!` });
+        showToast(`Joined ${d.name}`, "success");
       } else {
-        setMessage({ type: "error", text: d.error });
+        showToast(d.error || "Failed to join", "error");
       }
     } finally {
-      setJoining(false);
+      setLoading(false);
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function createFamily(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
-    setMessage(null);
+    if (!newFamilyName.trim()) return;
+    setLoading(true);
     try {
       const res = await fetch("/api/family/create", {
         method: "POST",
@@ -92,94 +77,124 @@ export default function FamilyPage() {
       if (res.ok) {
         await refresh();
         setNewFamilyName("");
-        setMessage({ type: "success", text: `Family "${d.name}" created.` });
+        showToast("Family created", "success");
       } else {
-        setMessage({ type: "error", text: d.error });
+        showToast(d.error || "Failed to create", "error");
       }
     } finally {
-      setCreating(false);
+      setLoading(false);
     }
   }
 
-  async function copyInviteCode() {
-    if (!user?.family?.inviteCode) return;
-    await navigator.clipboard.writeText(user.family.inviteCode);
-    setMessage({ type: "success", text: "Invite code copied!" });
-    setTimeout(() => setMessage(null), 2000);
+  async function removeMember(memberId: string, memberName: string) {
+    if (!confirm(`Remove ${memberName} from the family?`)) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/family/members?userId=${memberId}`, { method: "DELETE" });
+      const d = await res.json();
+      if (res.ok) {
+        await refresh();
+        showToast(`${memberName} removed`, "success");
+      } else {
+        showToast(d.error || "Failed", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function leaveFamily() {
+    const otherMembers = family?.members.filter((m) => m.id !== user.id) ?? [];
+    if (isAdmin && otherMembers.length > 0 && !transferTo) {
+      showToast("Select a member to transfer admin role to first", "error");
+      return;
+    }
+    if (!confirm("Leave this family?")) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/family/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(transferTo ? { transferToUserId: transferTo } : {}),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        await refresh();
+        showToast("Left family", "success");
+      } else {
+        showToast(d.error || "Failed", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/profile" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm">← Profile</Link>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Family</h1>
-      </div>
+      <h1 className="text-xl font-bold text-gray-900 dark:text-white">Family</h1>
 
-      {message && (
-        <div className={`px-4 py-3 rounded-xl text-sm ${message.type === "success" ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"}`}>
-          {message.text}
-        </div>
-      )}
-
-      {user.family ? (
+      {family ? (
         <>
           {/* Family info */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-gray-900 dark:text-white">{user.family.name}</h2>
-                <p className="text-xs text-gray-400">{user.family.members.length} member{user.family.members.length !== 1 ? "s" : ""}</p>
+                <h2 className="font-semibold text-gray-900 dark:text-white">{family.name}</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{family.members.length} member{family.members.length !== 1 ? "s" : ""}</p>
               </div>
+              <span className="text-2xl">👨‍👩‍👧</span>
             </div>
 
             {/* Members list */}
             <div className="space-y-2">
-              {user.family.members.map((m) => {
-                const initials = m.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-                return (
-                  <div key={m.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center text-xs font-bold text-brand-600 dark:text-brand-400">
-                        {initials}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{m.name}</p>
-                        <p className="text-xs text-gray-400">{m.role}</p>
-                      </div>
+              {family.members.map((m) => (
+                <div key={m.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-xs font-bold text-brand-700 dark:text-brand-300">
+                      {m.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)}
                     </div>
-                    {isAdmin && m.id !== user.id && (
-                      <button
-                        onClick={() => removeMember(m.id)}
-                        disabled={loading}
-                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    )}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {m.name} {m.id === user.id && <span className="text-gray-400">(you)</span>}
+                      </p>
+                      {m.role === "admin" && (
+                        <p className="text-xs text-brand-600 dark:text-brand-400">Admin</p>
+                      )}
+                    </div>
                   </div>
-                );
-              })}
+                  {isAdmin && m.id !== user.id && (
+                    <button
+                      onClick={() => removeMember(m.id, m.name)}
+                      disabled={loading}
+                      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Invite code (admin only) */}
-          {isAdmin && user.family.inviteCode && (
+          {isAdmin && family.inviteCode && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Invite Code</h2>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-xl text-sm font-mono text-gray-700 dark:text-gray-300 truncate">
-                  {user.family.inviteCode}
+              <h2 className="font-semibold text-gray-900 dark:text-white">Invite Code</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Share this with family members so they can join.</p>
+              <div className="flex gap-2">
+                <code className="flex-1 bg-gray-50 dark:bg-gray-700 px-3 py-2 rounded-xl text-xs font-mono text-gray-700 dark:text-gray-300 truncate">
+                  {family.inviteCode}
                 </code>
                 <button
                   onClick={copyInviteCode}
-                  className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium rounded-xl transition-colors"
+                  className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl transition-colors shrink-0"
                 >
-                  Copy
+                  {copiedCode ? "Copied!" : "Copy"}
                 </button>
               </div>
-              {user.family.inviteExpiresAt && (
+              {family.inviteExpiresAt && (
                 <p className="text-xs text-gray-400">
-                  Expires {new Date(user.family.inviteExpiresAt).toLocaleDateString()}
+                  Expires {new Date(family.inviteExpiresAt).toLocaleDateString()}
                 </p>
               )}
               <button
@@ -187,78 +202,85 @@ export default function FamilyPage() {
                 disabled={loading}
                 className="text-sm text-brand-600 dark:text-brand-400 hover:underline disabled:opacity-50"
               >
-                Regenerate code
+                🔄 Generate new code
               </button>
             </div>
           )}
 
           {/* Leave family */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm mb-2">Leave Family</h2>
-            {isAdmin && user.family.members.length > 1 ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                You&apos;re the admin. Transfer admin to another member before leaving. (Feature coming — contact the other member to make them admin first.)
-              </p>
-            ) : (
-              <button
-                onClick={async () => {
-                  if (!confirm("Leave this family?")) return;
-                  const res = await fetch("/api/family/leave", { method: "POST" });
-                  if (res.ok) { await refresh(); setMessage({ type: "success", text: "Left family." }); }
-                  else { const d = await res.json(); setMessage({ type: "error", text: d.error }); }
-                }}
-                className="text-sm text-red-600 dark:text-red-400 hover:underline"
-              >
-                Leave family
-              </button>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Leave Family</h2>
+            {isAdmin && (family.members.filter((m) => m.id !== user.id).length > 0) && (
+              <div>
+                <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                  Transfer admin role to:
+                </label>
+                <select
+                  value={transferTo}
+                  onChange={(e) => setTransferTo(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— select member —</option>
+                  {family.members.filter((m) => m.id !== user.id).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
             )}
+            <button
+              onClick={leaveFamily}
+              disabled={loading}
+              className="w-full py-2.5 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm font-semibold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+            >
+              Leave family
+            </button>
           </div>
         </>
       ) : (
-        <>
-          {/* No family — join or create */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-            You&apos;re not in a family yet. Join one with an invite code or create your own.
-          </div>
-
-          <form onSubmit={handleJoin} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Join a Family</h2>
+        /* No family — join or create */
+        <div className="space-y-4">
+          <form onSubmit={joinFamily} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Join a Family</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Enter an invite code from a family admin.</p>
             <input
               type="text"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               required
-              placeholder="Enter invite code"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             />
             <button
               type="submit"
-              disabled={joining}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+              disabled={loading || !joinCode.trim()}
+              className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
             >
-              {joining ? "Joining…" : "Join family"}
+              {loading ? "Joining…" : "Join family"}
             </button>
           </form>
 
-          <form onSubmit={handleCreate} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
-            <h2 className="font-semibold text-gray-900 dark:text-white text-sm">Create a Family</h2>
+          <div className="text-center text-sm text-gray-400">or</div>
+
+          <form onSubmit={createFamily} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900 dark:text-white">Create a Family</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Start your own family group and invite others.</p>
             <input
               type="text"
               value={newFamilyName}
               onChange={(e) => setNewFamilyName(e.target.value)}
               required
-              placeholder="e.g. The Smiths"
               className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="e.g. The Smith Family"
             />
             <button
               type="submit"
-              disabled={creating}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
+              disabled={loading || !newFamilyName.trim()}
+              className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
             >
-              {creating ? "Creating…" : "Create family"}
+              {loading ? "Creating…" : "Create family"}
             </button>
           </form>
-        </>
+        </div>
       )}
     </div>
   );
