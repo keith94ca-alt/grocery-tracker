@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getFamilyId } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
+  const familyId = getFamilyId(request);
+
   try {
     const contentType = request.headers.get("content-type") || "";
 
     if (contentType.includes("application/json")) {
-      return handleJsonImport(request);
+      return handleJsonImport(request, familyId);
     }
 
     if (contentType.includes("text/csv")) {
-      return handleCsvImport(request);
+      return handleCsvImport(request, familyId);
     }
 
     return NextResponse.json(
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleJsonImport(request: NextRequest) {
+async function handleJsonImport(request: NextRequest, familyId: string | null) {
   const data = await request.json();
 
   if (!data.items || !Array.isArray(data.items)) {
@@ -34,14 +37,12 @@ async function handleJsonImport(request: NextRequest) {
   let skipped = 0;
 
   for (const item of data.items) {
-    // Check if item already exists
-    const existing = await prisma.item.findUnique({ where: { name: item.name } });
+    const existing = await prisma.item.findFirst({ where: { name: item.name, familyId } });
     if (existing) {
       skipped++;
       continue;
     }
 
-    // Create item
     const created = await prisma.item.create({
       data: {
         name: item.name,
@@ -49,10 +50,10 @@ async function handleJsonImport(request: NextRequest) {
         unit: item.unit || "each",
         watched: item.watched || false,
         targetPrice: item.targetPrice || null,
+        familyId,
       },
     });
 
-    // Import price entries
     if (item.priceEntries && Array.isArray(item.priceEntries)) {
       for (const entry of item.priceEntries) {
         await prisma.priceEntry.create({
@@ -67,13 +68,13 @@ async function handleJsonImport(request: NextRequest) {
             priceType: entry.priceType || "normal",
             date: new Date(entry.date),
             notes: entry.notes,
+            familyId,
           },
         });
-        // Ensure store exists
         await prisma.store.upsert({
-          where: { name: entry.store },
+          where: { name_familyId: { name: entry.store, familyId: familyId ?? "" } },
           update: {},
-          create: { name: entry.store, type: "grocery" },
+          create: { name: entry.store, type: "grocery", familyId },
         });
       }
     }
@@ -84,7 +85,7 @@ async function handleJsonImport(request: NextRequest) {
   return NextResponse.json({ imported, skipped, total: data.items.length });
 }
 
-async function handleCsvImport(request: NextRequest) {
+async function handleCsvImport(request: NextRequest, familyId: string | null) {
   const csv = await request.text();
   const lines = csv.trim().split("\n");
 
@@ -92,7 +93,6 @@ async function handleCsvImport(request: NextRequest) {
     return NextResponse.json({ error: "CSV must have a header and at least one data row" }, { status: 400 });
   }
 
-  // Parse header
   const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
   const dateIdx = header.indexOf("date");
   const itemIdx = header.indexOf("item");
@@ -115,14 +115,14 @@ async function handleCsvImport(request: NextRequest) {
     const itemName = cols[itemIdx]?.trim();
     if (!itemName) continue;
 
-    // Find or create item
-    let item = await prisma.item.findUnique({ where: { name: itemName } });
+    let item = await prisma.item.findFirst({ where: { name: itemName, familyId } });
     if (!item) {
       item = await prisma.item.create({
         data: {
           name: itemName,
           category: cols[categoryIdx]?.trim() || "Other",
           unit: cols[unitIdx]?.trim() || "each",
+          familyId,
         },
       });
     }
@@ -148,13 +148,14 @@ async function handleCsvImport(request: NextRequest) {
         priceType: "normal",
         date: new Date(cols[dateIdx] || new Date()),
         notes: cols[notesIdx]?.trim() || null,
+        familyId,
       },
     });
 
     await prisma.store.upsert({
-      where: { name: store },
+      where: { name_familyId: { name: store, familyId: familyId ?? "" } },
       update: {},
-      create: { name: store, type: "grocery" },
+      create: { name: store, type: "grocery", familyId },
     });
 
     imported++;

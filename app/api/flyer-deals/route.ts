@@ -2,25 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchFlyerBrowse, matchesTrackedItem, FlippItem } from "@/lib/flipp";
 import { normalizePrice, sameUnitGroup } from "@/lib/units";
+import { getFamilyId } from "@/lib/auth";
 
 const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "N2B3J1";
 
 export interface DealResult {
   itemId: number;
   itemName: string;
-  normalUnitPrice: number | null;    // cheapest normal price across all stores
-  normalUnit: string | null;         // canonical unit for normal price
-  normalStore: string | null;        // store with cheapest normal price
-  bestDeal: FlippItem;               // best matching flyer item (raw Flipp data)
-  flyerUnitPrice: number | null;     // flyer price normalized to same canonical unit
-  flyerUnit: string | null;          // canonical unit for flyer price
+  normalUnitPrice: number | null;
+  normalUnit: string | null;
+  normalStore: string | null;
+  bestDeal: FlippItem;
+  flyerUnitPrice: number | null;
+  flyerUnit: string | null;
   allDeals: FlippItem[];
-  savingsPercent: number | null;     // how much cheaper vs your normal price
-  isCheaper: boolean;                // true when flyer unit price < normal price
-  isOnFlyer: boolean;                // true whenever ANY flyer match found
+  savingsPercent: number | null;
+  isCheaper: boolean;
+  isOnFlyer: boolean;
 }
 
 export async function GET(request: NextRequest) {
+  const familyId = getFamilyId(request);
   const { searchParams } = new URL(request.url);
   const itemIdParam = searchParams.get("itemId");
 
@@ -28,9 +30,12 @@ export async function GET(request: NextRequest) {
     const flyerItems = await fetchFlyerBrowse(POSTAL_CODE);
 
     const items = await prisma.item.findMany({
-      where: itemIdParam
-        ? { id: parseInt(itemIdParam) }
-        : { OR: [{ priceEntries: { some: {} } }, { watched: true }] },
+      where: {
+        familyId,
+        ...(itemIdParam
+          ? { id: parseInt(itemIdParam) }
+          : { OR: [{ priceEntries: { some: {} } }, { watched: true }] }),
+      },
       include: {
         priceEntries: {
           orderBy: { date: "desc" },
@@ -57,26 +62,20 @@ export async function GET(request: NextRequest) {
       const matches = flyerItems.filter((fi) => matchesTrackedItem(fi.name, item.name));
       if (matches.length === 0) continue;
 
-      // Find all "normal" (non-sale) manual/receipt entries
       const normalEntries = item.priceEntries.filter(
         (e) => (e.source === "manual" || e.source === "receipt") && e.priceType === "normal"
       );
-
-      // If no normal entries exist, fall back to all manual/receipt entries
-      // (for backward compatibility with existing data that has no priceType)
       const baselineEntries = normalEntries.length > 0
         ? normalEntries
         : item.priceEntries.filter((e) => e.source === "manual" || e.source === "receipt");
 
       const best = matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
 
-      // Compute normal price comparison only if baseline entries exist
       let cheapestNorm: { price: number; unit: string } | null = null;
       let cheapestStore: string | null = null;
       let isCheaper = false;
       let savingsPercent: number | null = null;
 
-      // Flyer note and flyer norm — needed for both watchlist and tracked items
       const noteKey = `${item.id}:${best.id}:${best.merchantName}`;
       const flyerNote = flyerNoteMap.get(noteKey);
       const flyerNorm = flyerNote
@@ -97,45 +96,30 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        if (
-          flyerNorm &&
-          cheapestNorm &&
-          sameUnitGroup(flyerNorm.unit, cheapestNorm.unit)
-        ) {
+        if (flyerNorm && cheapestNorm && sameUnitGroup(flyerNorm.unit, cheapestNorm.unit)) {
           isCheaper = flyerNorm.price < cheapestNorm.price;
           if (isCheaper) {
             savingsPercent = Math.round((1 - flyerNorm.price / cheapestNorm.price) * 100);
           }
-        } else if (
-          !flyerNorm &&
-          cheapestNorm &&
-          (cheapestNorm.unit === "each" || cheapestNorm.unit === "per pack")
-        ) {
+        } else if (!flyerNorm && cheapestNorm && (cheapestNorm.unit === "each" || cheapestNorm.unit === "per pack")) {
           isCheaper = best.currentPrice < cheapestNorm.price;
           if (isCheaper) {
             savingsPercent = Math.round((1 - best.currentPrice / cheapestNorm.price) * 100);
           }
         }
       } else {
-        // No price history — show flyer deal anyway (watchlist items without history)
         isCheaper = true;
       }
 
       const enrichedDeals = matches.map((m) => {
         const mNoteKey = `${item.id}:${m.id}:${m.merchantName}`;
         const mNote = flyerNoteMap.get(mNoteKey);
-        if (mNote) {
-          return { ...m, unitPrice: mNote.unitPrice, unit: mNote.unit };
-        }
-        return m;
+        return mNote ? { ...m, unitPrice: mNote.unitPrice, unit: mNote.unit } : m;
       });
 
       const enrichedBest = (() => {
         const mNote = flyerNoteMap.get(noteKey);
-        if (mNote) {
-          return { ...best, unitPrice: mNote.unitPrice, unit: mNote.unit };
-        }
-        return best;
+        return mNote ? { ...best, unitPrice: mNote.unitPrice, unit: mNote.unit } : best;
       })();
 
       results.push({
