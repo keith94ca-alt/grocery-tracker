@@ -11,7 +11,8 @@ const PUBLIC_API_PATHS = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only protect /api/* routes
+  // Login/register pages are public (client-side auth guard handles page-level redirects)
+  // Only enforce auth at the API layer via this middleware
   if (!pathname.startsWith("/api/")) {
     return NextResponse.next();
   }

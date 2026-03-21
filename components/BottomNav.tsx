@@ -15,6 +15,7 @@ const sideItems = [
   { href: "/stores", label: "Stores", icon: "🏪" },
   { href: "/compare", label: "Compare Stores", icon: "⚖️" },
   { href: "/history", label: "Price History", icon: "📋" },
+  { href: "/profile", label: "Profile", icon: "👤" },
 ];
 
 export default function BottomNav() {

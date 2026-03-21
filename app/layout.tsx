@@ -5,6 +5,7 @@ import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientLayout from "@/components/ClientLayout";
 import FAB from "@/components/FAB";
 import DarkModeToggle from "@/components/DarkModeToggle";
+import UserMenu from "@/components/UserMenu";
 
 export const metadata: Metadata = {
   title: "Grocery Price Tracker",
@@ -43,7 +44,10 @@ export default function RootLayout({
                 <span className="text-2xl">🛒</span>
                 <h1 className="text-lg font-bold tracking-tight">Grocery Price Tracker</h1>
               </div>
-              <DarkModeToggle />
+              <div className="flex items-center gap-2">
+                <DarkModeToggle />
+                <UserMenu />
+              </div>
             </div>
           </header>
           <main className="max-w-2xl lg:max-w-none mx-auto px-1 lg:px-6 lg:ml-56">
