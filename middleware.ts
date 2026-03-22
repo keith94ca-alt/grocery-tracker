@@ -8,7 +8,7 @@ const PUBLIC_API_PATHS = [
   "/api/auth/logout",
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Login/register pages are public (client-side auth guard handles page-level redirects)
@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = getSessionFromRequest(request);
+  const session = await getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

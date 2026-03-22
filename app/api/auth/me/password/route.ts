@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionFromRequest, hashPassword } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
-  const session = getSessionFromRequest(request);
+  const session = await getSessionFromRequest(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

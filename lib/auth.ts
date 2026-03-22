@@ -1,17 +1,18 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-function getJwtSecret(): string {
+function getJwtSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("JWT_SECRET environment variable is required in production. Set it in Portainer.");
     }
-    return "dev-secret-change-in-production";
+    return new TextEncoder().encode("dev-secret-change-in-production");
   }
-  return secret;
+  return new TextEncoder().encode(secret);
 }
+
 const COOKIE_NAME = "gt_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -32,14 +33,19 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// JWT
-export function signToken(payload: SessionPayload): string {
-  return jwt.sign(payload, getJwtSecret(), { expiresIn: "7d" });
+// JWT (jose — Edge + Node compatible)
+export async function signToken(payload: SessionPayload): Promise<string> {
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("7d")
+    .setIssuedAt()
+    .sign(getJwtSecret());
 }
 
-export function verifyToken(token: string): SessionPayload | null {
+export async function verifyToken(token: string): Promise<SessionPayload | null> {
   try {
-    return jwt.verify(token, getJwtSecret()) as SessionPayload;
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    return payload as unknown as SessionPayload;
   } catch {
     return null;
   }
@@ -47,12 +53,12 @@ export function verifyToken(token: string): SessionPayload | null {
 
 // Cookie helpers (server-side, App Router)
 export async function setSessionCookie(payload: SessionPayload): Promise<void> {
-  const token = signToken(payload);
+  const token = await signToken(payload);
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: COOKIE_MAX_AGE,
     path: "/",
   });
@@ -70,8 +76,8 @@ export async function getSessionFromCookies(): Promise<SessionPayload | null> {
   return verifyToken(token);
 }
 
-// For use in API route handlers (reads from Request directly)
-export function getSessionFromRequest(request: Request): SessionPayload | null {
+// For use in API route handlers and middleware (reads from Request directly)
+export async function getSessionFromRequest(request: Request): Promise<SessionPayload | null> {
   const cookieHeader = request.headers.get("cookie");
   if (!cookieHeader) return null;
 
