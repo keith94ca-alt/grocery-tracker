@@ -15,8 +15,9 @@ export async function PATCH(
 
   try {
     // IDOR check: verify shopping list item belongs to this user's family
+    // Also allow items with null familyId (legacy data pre-family-scoping)
     const existing = await prisma.shoppingListItem.findUnique({ where: { id }, select: { familyId: true } });
-    if (!existing || existing.familyId !== familyId) {
+    if (!existing || (existing.familyId !== null && existing.familyId !== familyId)) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
@@ -53,8 +54,9 @@ export async function DELETE(
 
   try {
     // IDOR check: verify shopping list item belongs to this user's family
+    // Also allow items with null familyId (legacy data pre-family-scoping)
     const existing = await prisma.shoppingListItem.findUnique({ where: { id }, select: { familyId: true } });
-    if (!existing || existing.familyId !== familyId) {
+    if (!existing || (existing.familyId !== null && existing.familyId !== familyId)) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
