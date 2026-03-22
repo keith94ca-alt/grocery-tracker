@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizePrice, getCanonicalUnit } from "@/lib/units";
+import { getFamilyId } from "@/lib/auth";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const id = parseInt(params.id);
   if (isNaN(id)) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
+
+  const familyId = getFamilyId(request);
 
   try {
     const item = await prisma.item.findUnique({
@@ -23,6 +26,11 @@ export async function GET(
     });
 
     if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
+    // IDOR check: item must belong to this user's family
+    if (item.familyId !== familyId) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
@@ -64,7 +72,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
+  const familyId = getFamilyId(request);
+
   try {
+    // IDOR check: verify item belongs to this user's family before updating
+    const existing = await prisma.item.findUnique({ where: { id }, select: { familyId: true } });
+    if (!existing || existing.familyId !== familyId) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
     const body = await request.json();
     const { name, category, unit, watched, targetPrice } = body as {
       name?: string;
@@ -104,7 +120,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const id = parseInt(params.id);
@@ -112,7 +128,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
+  const familyId = getFamilyId(request);
+
   try {
+    // IDOR check: verify item belongs to this user's family before deleting
+    const existing = await prisma.item.findUnique({ where: { id }, select: { familyId: true } });
+    if (!existing || existing.familyId !== familyId) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
     await prisma.item.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {

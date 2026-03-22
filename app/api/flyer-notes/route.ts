@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getFamilyId } from "@/lib/auth";
 
 /**
  * POST /api/flyer-notes
@@ -11,6 +12,7 @@ import { prisma } from "@/lib/prisma";
  * Body: { itemName, flippId, price, unitPrice, unit, store, validFrom, validTo }
  */
 export async function POST(request: NextRequest) {
+  const familyId = getFamilyId(request);
   try {
     const body = await request.json();
     const { itemName, flippId, price, unitPrice, unit, store, validFrom, validTo } = body;
@@ -19,11 +21,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Find or create the item
-    let item = await prisma.item.findUnique({ where: { name: itemName } });
+    // Find or create the item scoped to this family
+    let item = await prisma.item.findFirst({ where: { name: itemName, familyId } });
     if (!item) {
       item = await prisma.item.create({
-        data: { name: itemName, unit: unit || "each" },
+        data: { name: itemName, unit: unit || "each", familyId },
       });
     }
 
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
         store: store || "Unknown",
         validFrom: validFrom || "",
         validTo: validTo || "",
+        familyId,
       },
     });
 
@@ -64,15 +67,19 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/flyer-notes
- * Get all flyer notes, optionally filtered by itemId.
+ * Get all flyer notes for this family, optionally filtered by itemId.
  */
 export async function GET(request: NextRequest) {
+  const familyId = getFamilyId(request);
   const { searchParams } = new URL(request.url);
   const itemId = searchParams.get("itemId");
 
   try {
     const notes = await prisma.flyerNote.findMany({
-      where: itemId ? { itemId: parseInt(itemId) } : {},
+      where: {
+        familyId,
+        ...(itemId ? { itemId: parseInt(itemId) } : {}),
+      },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json(notes);

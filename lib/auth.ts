@@ -34,8 +34,13 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 // JWT (jose — Edge + Node compatible)
+// Only store minimal claims in the token — no PII like name/email
 export async function signToken(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ ...payload })
+  return new SignJWT({
+    userId: payload.userId,
+    familyId: payload.familyId,
+    role: payload.role,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("7d")
     .setIssuedAt()
@@ -45,7 +50,15 @@ export async function signToken(payload: SessionPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getJwtSecret());
-    return payload as unknown as SessionPayload;
+    const p = payload as Record<string, unknown>;
+    if (!p.userId || !p.role) return null;
+    return {
+      userId: p.userId as string,
+      familyId: (p.familyId as string | null) ?? null,
+      role: p.role as string,
+      name: "",
+      email: "",
+    };
   } catch {
     return null;
   }

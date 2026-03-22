@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getFamilyId } from "@/lib/auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -10,7 +11,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
+  const familyId = getFamilyId(request);
+
   try {
+    // IDOR check: verify shopping list item belongs to this user's family
+    const existing = await prisma.shoppingListItem.findUnique({ where: { id }, select: { familyId: true } });
+    if (!existing || existing.familyId !== familyId) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
     const body = await request.json();
     const data: Record<string, unknown> = {};
     if (body.checked !== undefined) data.checked = body.checked;
@@ -32,7 +41,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const id = parseInt(params.id);
@@ -40,7 +49,15 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
+  const familyId = getFamilyId(request);
+
   try {
+    // IDOR check: verify shopping list item belongs to this user's family
+    const existing = await prisma.shoppingListItem.findUnique({ where: { id }, select: { familyId: true } });
+    if (!existing || existing.familyId !== familyId) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    }
+
     await prisma.shoppingListItem.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
