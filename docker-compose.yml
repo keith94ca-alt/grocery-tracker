@@ -8,6 +8,7 @@ services:
       - DATABASE_URL=file:/data/prices.db
       - NODE_ENV=production
       - FLIPP_POSTAL_CODE=N2B3J1
+      - JWT_SECRET=GaGFkx2ay7@aNyzKx$3INAykLZ7xb12
     volumes:
       - db-data:/data
     networks:
