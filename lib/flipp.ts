@@ -329,7 +329,12 @@ export function matchesTrackedItem(flippName: string, trackedName: string): bool
   // and dietary descriptors (halal, probiotic, etc.) in the flyer name are fine.
   if (trackedKw.size >= 3) {
     const coverageTrackedToFlyer = intersect / flippKw.size;
-    if (trackedInFlyer && !flyerInTracked && coverageTrackedToFlyer < 0.55) {
+    // If all tracked keywords appear in the flyer name, it's a valid match — the flyer
+    // just has extra words (brand name, roast type, etc.). Only block when coverage is
+    // very low (< 0.40), which indicates the flyer item is truly a different product.
+    // Previously this threshold was 0.55 which blocked "Whole Bean Coffee" matching
+    // "NABOB Roast & Ground or Whole Bean Coffee" (3/6 = 0.50).
+    if (trackedInFlyer && !flyerInTracked && coverageTrackedToFlyer < 0.40) {
       // Check if the extra flyer keywords look like product descriptors, not brands/variants
       const extraFlyerKw = [...flippKw].filter(
         (fw) => ![...trackedKw].some((tw) => wordMatches(tw, fw))
