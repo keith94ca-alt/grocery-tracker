@@ -68,7 +68,17 @@ export async function GET(request: NextRequest) {
         ? normalEntries
         : item.priceEntries.filter((e) => e.source === "manual" || e.source === "receipt");
 
-      const best = matches.reduce((a, b) => (a.currentPrice < b.currentPrice ? a : b));
+      // Pick best deal by unit price when available (apples-to-apples comparison).
+      // Fall back to raw currentPrice only when no unit prices exist.
+      const hasUnitPrices = matches.some((m) => m.unitPrice !== null);
+      const best = matches.reduce((a, b) => {
+        if (hasUnitPrices) {
+          const aUnit = a.unitPrice ?? Infinity;
+          const bUnit = b.unitPrice ?? Infinity;
+          return aUnit <= bUnit ? a : b;
+        }
+        return a.currentPrice < b.currentPrice ? a : b;
+      });
 
       // Compute normal price comparison only if baseline entries exist
       let cheapestNorm: { price: number; unit: string } | null = null;
