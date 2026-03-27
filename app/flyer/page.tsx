@@ -864,7 +864,7 @@ function FlyerPageContent() {
               : "border-transparent text-gray-500"
           }`}
         >
-          On Your List {!loading && `(${uniqueTrackedCount})`}
+          🔍 Needs Review {!loading && `(${uniqueTrackedCount})`}
         </button>
         <button
           onClick={() => setTab("deals")}

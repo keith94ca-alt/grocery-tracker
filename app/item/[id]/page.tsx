@@ -430,6 +430,7 @@ export default function ItemPage() {
   const [undoStack, setUndoStack] = useState<{ entry: PriceEntry; index: number }[]>([]);
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState("");
+  const [targetUnit, setTargetUnit] = useState<string>("per kg");
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -456,17 +457,23 @@ export default function ItemPage() {
       .catch(() => {});
   }, [params.id]);
 
-  async function saveTargetPrice(price: number | null) {
+  async function saveTargetPrice(price: number | null, unit?: string) {
     try {
+      // Convert to canonical unit before saving
+      let finalPrice = price;
+      if (price && unit && canonicalUnit && unit !== canonicalUnit) {
+        const converted = convertUnitPrice(price, unit, canonicalUnit);
+        if (converted !== null) finalPrice = converted;
+      }
       const res = await fetch(`/api/items/${params.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetPrice: price }),
+        body: JSON.stringify({ targetPrice: finalPrice }),
       });
       if (res.ok) {
         const updated = await res.json();
         setItem((prev) => prev ? { ...prev, targetPrice: updated.targetPrice } : prev);
-        toast(price ? `Target price set to $${price.toFixed(2)}` : "Target price cleared", "success");
+        toast(finalPrice ? `Target price set to $${finalPrice.toFixed(2)}/${canonicalUnit.replace("per ", "")}` : "Target price cleared", "success");
       }
     } catch {
       toast("Failed to save target price", "error");
@@ -554,7 +561,7 @@ export default function ItemPage() {
       {/* Target price */}
       {editingTarget ? (
         <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-2">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-400">Set your target price per {canonicalUnit.replace("per ", "")}</p>
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-400">Set your target price</p>
           <div className="flex gap-2">
             <input
               type="number"
@@ -567,7 +574,14 @@ export default function ItemPage() {
               autoFocus
               className="flex-1 px-3 py-2 border border-blue-300 dark:border-blue-700 dark:bg-gray-700 dark:text-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <button onClick={() => saveTargetPrice(parseFloat(targetInput) || null)}
+            <select
+              value={targetUnit}
+              onChange={(e) => setTargetUnit(e.target.value)}
+              className="px-3 py-2 border border-blue-300 dark:border-blue-700 dark:bg-gray-700 dark:text-gray-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {UNITS.map((u) => <option key={u} value={u}>{u.replace("per ", "")}</option>)}
+            </select>
+            <button onClick={() => saveTargetPrice(parseFloat(targetInput) || null, targetUnit)}
               className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold">
               Save
             </button>
@@ -576,6 +590,12 @@ export default function ItemPage() {
               ✕
             </button>
           </div>
+          {targetUnit !== canonicalUnit && targetInput && parseFloat(targetInput) > 0 && (() => {
+            const converted = convertUnitPrice(parseFloat(targetInput), targetUnit, canonicalUnit);
+            return converted !== null ? (
+              <p className="text-xs text-blue-600 dark:text-blue-400">= ${converted.toFixed(2)}/{canonicalUnit.replace("per ", "")} (canonical)</p>
+            ) : null;
+          })()}
           {item.targetPrice && (
             <p className="text-xs text-blue-600 dark:text-blue-400">Current target: ${item.targetPrice.toFixed(2)}/{canonicalUnit.replace("per ", "")}</p>
           )}
