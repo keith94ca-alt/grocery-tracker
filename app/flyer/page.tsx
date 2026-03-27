@@ -454,11 +454,13 @@ function FlyerCard({
   added,
   onAction,
   onDismiss,
+  showCompare = true,
 }: {
   item: FlyerBrowseItemWithNormal;
   added: boolean;
   onAction: () => void;
   onDismiss?: () => void;
+  showCompare?: boolean;
 }) {
   const { flippItem, trackedMatch, normalUnitPrice, normalUnit } = item;
   const unitLabel = flippItem.unit?.replace("per ", "");
@@ -531,16 +533,18 @@ function FlyerCard({
           <span className="mt-2 inline-block text-xs text-green-600 font-semibold">✓ Added</span>
         ) : (
           <div className="mt-2 flex gap-1.5">
-            <button
-              onClick={onAction}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
-                trackedMatch
-                  ? "bg-brand-100 text-brand-700"
-                  : "bg-orange-100 text-orange-700"
-              }`}
-            >
-              {trackedMatch ? "Compare" : "Track This"}
-            </button>
+            {(showCompare || !trackedMatch) && (
+              <button
+                onClick={onAction}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                  trackedMatch
+                    ? "bg-brand-100 text-brand-700"
+                    : "bg-orange-100 text-orange-700"
+                }`}
+              >
+                {trackedMatch ? "Compare" : "Track This"}
+              </button>
+            )}
             <button
               onClick={() => {
                 const name = trackedMatch?.name ?? simplifyFlyerName(flippItem.name);
@@ -981,6 +985,7 @@ function FlyerPageContent() {
               key={item.flippItem.id}
               item={item}
               added={added.has(item.flippItem.id)}
+              showCompare={false}
               onAction={() => setModal({ flippItem: item.flippItem, trackedMatch: item.trackedMatch })}
               onDismiss={item.trackedMatch ? () => setConfirmDismiss({
                 trackedItemId: item.trackedMatch!.id,
