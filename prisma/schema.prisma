@@ -14,10 +14,13 @@ model Item {
   category     String       @default("Other")
   unit         String       @default("each")
   watched      Boolean      @default(false)
-  targetPrice      Float?       // User's target price for this item (optional)
-  createdAt        DateTime     @default(now())
-  priceEntries     PriceEntry[]
-  flyerNotes       FlyerNote[]
+  targetPrice  Float?        // User's target price for this item (optional)
+  upc          String?       @unique  // 12-digit UPC/EAN barcode
+  brand        String?       // Product brand from Open Food Facts
+  imageUrl     String?       // Product image URL
+  createdAt    DateTime     @default(now())
+  priceEntries PriceEntry[]
+  flyerNotes   FlyerNote[]
   shoppingListItems ShoppingListItem[]
 }
 
