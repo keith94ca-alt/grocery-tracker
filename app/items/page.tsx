@@ -22,6 +22,9 @@ interface ManagedItem {
   unit: string;
   watched: boolean;
   targetPrice: number | null;
+  upc: string | null;
+  brand: string | null;
+  imageUrl: string | null;
   _count: { priceEntries: number };
   lastPrice?: { unitPrice: number; store: string; date: string; unit: string } | null;
 }
@@ -39,12 +42,17 @@ function EditModal({
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState(item.category);
   const [targetPrice, setTargetPrice] = useState(item.targetPrice?.toString() || "");
+  const [upc, setUpc] = useState(item.upc || "");
+  const [brand, setBrand] = useState(item.brand || "");
+  const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   async function handleSave() {
     if (!name.trim()) { setError("Name is required"); return; }
+    const upcClean = upc.trim() || undefined;
+    if (upcClean && !/^\d{12,13}$/.test(upcClean)) { setError("UPC must be 12 or 13 digits"); return; }
     setSaving(true);
     setError(null);
     try {
@@ -55,9 +63,12 @@ function EditModal({
           name: name.trim(),
           category,
           targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+          upc: upcClean || null,
+          brand: brand.trim() || null,
         }),
       });
       if (res.status === 409) { setError("An item with that name already exists"); return; }
+      if (res.status === 400) { const d = await res.json(); setError(d.error || "Invalid input"); return; }
       if (!res.ok) { setError("Failed to save — try again"); return; }
       const updated = await res.json();
       toast(`Updated ${name.trim()}`, "success");
@@ -105,6 +116,65 @@ function EditModal({
               Get alerted when a deal beats this price
             </p>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Brand <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input type="text" value={brand} onChange={(e) => setBrand(e.target.value)}
+              placeholder="e.g. Great Value"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              UPC <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <div className="flex gap-2">
+              <input type="text" value={upc} onChange={(e) => setUpc(e.target.value)}
+                placeholder="12 or 13 digit UPC"
+                inputMode="numeric" maxLength={13}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <button type="button" onClick={() => {
+                if (!('BarcodeDetector' in window)) {
+                  toast('Barcode scanning not supported on this device', 'error');
+                  return;
+                }
+                setScanning(true);
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                  .then(async (stream) => {
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    await video.play();
+                    const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+                    const scan = async () => {
+                      if (!scanning) return;
+                      try {
+                        const codes = await detector.detect(video);
+                        if (codes.length > 0) {
+                          setUpc(codes[0].rawValue.replace(/^0/, ''));
+                          stream.getTracks().forEach(t => t.stop());
+                          setScanning(false);
+                          toast('UPC scanned!', 'success');
+                          return;
+                        }
+                      } catch {}
+                      requestAnimationFrame(scan);
+                    };
+                    scan();
+                  })
+                  .catch(() => {
+                    toast('Camera access denied', 'error');
+                    setScanning(false);
+                  });
+              }} className="px-3 py-2 bg-gray-100 hover:bg-brand-100 text-gray-600 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors" title="Scan UPC">
+                📷
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Scan with camera or type manually
+            </p>
+          </div>
         </div>
 
         <div className="flex gap-2 pt-1">
@@ -115,6 +185,7 @@ function EditModal({
           <button onClick={handleSave} disabled={saving}
             className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
             {saving ? "Saving…" : "Save"}
+          </button>
           </button>
         </div>
       </div>
@@ -323,6 +394,16 @@ export default function ItemsPage() {
           unit: d.unit,
           watched: d.watched,
           targetPrice: d.targetPrice,
+        const items: ManagedItem[] = data.map((d: { id: number; name: string; category: string; unit: string; watched: boolean; targetPrice: number | null; upc: string | null; brand: string | null; imageUrl: string | null; stats: { count: number; latest: number | null; latestStore: string | null; latestDate: string | null; canonicalUnit: string } | null }) => ({
+          id: d.id,
+          name: d.name,
+          category: d.category,
+          unit: d.unit,
+          watched: d.watched,
+          targetPrice: d.targetPrice,
+          upc: d.upc || null,
+          brand: d.brand || null,
+          imageUrl: d.imageUrl || null,
           _count: { priceEntries: d.stats?.count ?? 0 },
           lastPrice: d.stats?.latest ? {
             unitPrice: d.stats.latest,
@@ -332,6 +413,7 @@ export default function ItemsPage() {
           } : null,
         }));
         setItems(items.sort((a, b) => a.name.localeCompare(b.name)));
+      }
       }
     } finally {
       setLoading(false);

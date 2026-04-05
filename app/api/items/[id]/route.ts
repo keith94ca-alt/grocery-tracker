@@ -66,12 +66,15 @@ export async function PATCH(
 
   try {
     const body = await request.json();
-    const { name, category, unit, watched, targetPrice } = body as {
+    const { name, category, unit, watched, targetPrice, upc, brand, imageUrl } = body as {
       name?: string;
       category?: string;
       unit?: string;
       watched?: boolean;
       targetPrice?: number | null;
+      upc?: string | null;
+      brand?: string | null;
+      imageUrl?: string | null;
     };
 
     // Build partial update — only include fields that were provided
@@ -81,6 +84,16 @@ export async function PATCH(
     if (unit !== undefined) data.unit = unit;
     if (watched !== undefined) data.watched = watched;
     if (targetPrice !== undefined) data.targetPrice = targetPrice || null;
+    if (upc !== undefined) {
+      const cleaned = upc?.trim() || null;
+      // Validate UPC format (12 or 13 digits)
+      if (cleaned && !/^\d{12,13}$/.test(cleaned)) {
+        return NextResponse.json({ error: "UPC must be 12 or 13 digits" }, { status: 400 });
+      }
+      data.upc = cleaned;
+    }
+    if (brand !== undefined) data.brand = brand?.trim() || null;
+    if (imageUrl !== undefined) data.imageUrl = imageUrl?.trim() || null;
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
