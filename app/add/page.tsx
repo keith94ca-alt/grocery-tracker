@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const CATEGORIES = [
   "Produce", "Meat", "Seafood", "Dairy", "Bakery",
@@ -12,6 +13,19 @@ const CATEGORIES = [
 ];
 
 const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL", "per dozen", "per bunch"];
+
+function pickUnitFromQuantity(qtyStr: string | null): string {
+  if (!qtyStr) return "each";
+  const q = qtyStr.toLowerCase();
+  if (/ml|millilitre/i.test(q)) return "per 100mL";
+  if (/\bl\b/i.test(q)) return "per L";
+  if (/kg|kilogram/i.test(q)) return "per kg";
+  if (/\bg\b/i.test(q)) return "per 100g";
+  if (/lb|pound/i.test(q)) return "per lb";
+  if (/dozen/i.test(q)) return "per dozen";
+  if (/bunch/i.test(q)) return "per bunch";
+  return "each";
+}
 
 const PACK_SIZE_UNITS = ["mL", "L", "g", "kg", "lb", "oz"];
 
@@ -77,6 +91,10 @@ function AddForm() {
   const itemInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Barcode scanner state
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanningUpc, setScanningUpc] = useState<string | null>(null);
+
   const [form, setForm] = useState({
     itemName: searchParams.get("item") || "",
     category: "Other",
@@ -102,6 +120,7 @@ function AddForm() {
   const [error, setError] = useState("");
   const [dupWarning, setDupWarning] = useState<string | null>(null);
   const [recentEntries, setRecentEntries] = useState<{ itemName: string; store: string; date: string }[]>([]);
+  const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
   const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
 
   // Load recent items + last store from API
@@ -203,6 +222,46 @@ function AddForm() {
     });
   }
 
+  // Handle barcode scan result
+  const handleScan = useCallback(async (upc: string) => {
+    setShowScanner(false);
+    setScanningUpc(upc);
+    toast(`Scanned UPC: ${upc}`, "info");
+
+    try {
+      const res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ upc }),
+      });
+      const data = await res.json();
+
+      if (data.found && data.item) {
+        const item = data.item;
+        const unit = item.unitQuantity ? pickUnitFromQuantity(item.unitQuantity) : "each";
+        setForm((prev) => ({
+          ...prev,
+          itemName: item.name || prev.itemName,
+          category: item.category || "Other",
+          unit,
+        }));
+        toast(`Found: ${item.name}` + (item.brand ? ` (${item.brand})` : ""), "success");
+      } else {
+        toast("Product not found in database — enter details manually", "info");
+        setShowScanner(true); // let them try again
+      }
+    } catch {
+      toast("Lookup failed — enter details manually", "error");
+    } finally {
+      setScanningUpc(null);
+    }
+  }, [toast]);
+
+  const handleScanError = useCallback((err: string) => {
+    toast(err, "error");
+    setScanningUpc(null);
+  }, [toast]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -274,8 +333,17 @@ function AddForm() {
   return (
     <form onSubmit={handleSubmit} className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add Price Entry</h2>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Log what you paid so you can track price trends over time.</p>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Add Price Entry</h2>
+          <button
+            type="button"
+            onClick={() => setShowScanner(true)}
+            className="p-2 rounded-lg bg-brand-100 dark:bg-brand-900/30 text-brand-600 hover:bg-brand-200 dark:hover:bg-brand-900/50 transition-colors"
+            title="Scan barcode"
+          >
+            📷
+          </button>
+        </div>
         {recentItems.length > 0 && (
           <span className="text-xs text-gray-400 dark:text-gray-500">{recentItems.length} recent items</span>
         )}
@@ -585,6 +653,15 @@ function AddForm() {
       <p className="text-center text-xs text-gray-400">
         Tip: <Link href="/flyer" className="text-brand-600 font-medium">Browse flyers</Link> to find deals and log prices directly
       </p>
+
+      {/* Barcode Scanner Modal */}
+      {showScanner && (
+        <BarcodeScanner
+          onScan={handleScan}
+          onError={handleScanError}
+          onClose={() => { setShowScanner(false); setScanningUpc(null); }}
+        />
+      )}
     </form>
   );
 }
