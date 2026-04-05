@@ -49,6 +49,9 @@ async function handleJsonImport(request: NextRequest) {
         unit: item.unit || "each",
         watched: item.watched || false,
         targetPrice: item.targetPrice || null,
+        upc: item.upc || null,
+        brand: item.brand || null,
+        imageUrl: item.imageUrl || null,
       },
     });
 
@@ -104,6 +107,9 @@ async function handleCsvImport(request: NextRequest) {
   const unitIdx = header.indexOf("unit");
   const sourceIdx = header.indexOf("source");
   const notesIdx = header.indexOf("notes");
+  const upcIdx = header.indexOf("upc");
+  const brandIdx = header.indexOf("brand");
+  const imageUrlIdx = header.indexOf("image") >= 0 ? header.indexOf("image") : header.indexOf("imageurl") >= 0 ? header.indexOf("imageurl") : header.indexOf("image_url") >= 0 ? header.indexOf("image_url") : -1;
 
   let imported = 0;
   let skipped = 0;
@@ -118,11 +124,18 @@ async function handleCsvImport(request: NextRequest) {
     // Find or create item
     let item = await prisma.item.findUnique({ where: { name: itemName } });
     if (!item) {
+      const upc = upcIdx >= 0 ? cols[upcIdx]?.trim() || null : null;
+      const brand = brandIdx >= 0 ? cols[brandIdx]?.trim() || null : null;
+      const imageUrl = imageUrlIdx >= 0 ? cols[imageUrlIdx]?.trim() || null : null;
+
       item = await prisma.item.create({
         data: {
           name: itemName,
           category: cols[categoryIdx]?.trim() || "Other",
           unit: cols[unitIdx]?.trim() || "each",
+          upc: upc || null,
+          brand: brand || null,
+          imageUrl: imageUrl || null,
         },
       });
     }

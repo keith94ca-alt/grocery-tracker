@@ -5,10 +5,12 @@ export async function GET() {
   try {
     const entries = await prisma.priceEntry.findMany({
       orderBy: { date: "desc" },
-      include: { item: { select: { name: true, category: true, unit: true } } },
+      include: {
+        item: { select: { name: true, category: true, unit: true, upc: true, brand: true, imageUrl: true } },
+      },
     });
 
-    const header = "Date,Item,Category,Store,Price,Quantity,Unit Price,Unit,Source,Notes";
+    const header = "Date,Item,Category,UPC,Brand,Store,Price,Quantity,Unit Price,Unit,Source,Notes,Image URL";
     const rows = entries.map((e) => {
       const d = new Date(e.date).toLocaleDateString("en-CA");
       const escape = (s: string | null) => (s ? `"${s.replace(/"/g, '""')}"` : "");
@@ -16,6 +18,8 @@ export async function GET() {
         d,
         escape(e.item.name),
         escape(e.item.category),
+        escape(e.item.upc),
+        escape(e.item.brand),
         escape(e.store),
         e.price.toFixed(2),
         e.quantity,
@@ -23,6 +27,7 @@ export async function GET() {
         escape(e.item.unit),
         escape(e.source),
         escape(e.notes),
+        escape(e.item.imageUrl),
       ].join(",");
     });
 
