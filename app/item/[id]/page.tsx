@@ -29,6 +29,9 @@ interface ItemDetail {
   category: string;
   unit: string;
   targetPrice: number | null;
+  upc: string | null;
+  brand: string | null;
+  imageUrl: string | null;
   priceEntries: PriceEntry[];
   stats: {
     avg: number;
@@ -521,9 +524,21 @@ export default function ItemPage() {
       {/* Header */}
       <div className="flex items-start gap-3">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 mt-1 text-xl">←</button>
-        <div className="flex-1">
+        {item.imageUrl && (
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-16 h-16 rounded-xl object-cover bg-gray-100 shrink-0"
+            loading="eager"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
+        <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
-          <p className="text-sm text-gray-500">{item.category}</p>
+          <p className="text-sm text-gray-500">{item.brand ? `${item.brand} · ${item.category}` : item.category}</p>
+          {item.upc && (
+            <p className="text-xs text-gray-400 font-mono mt-0.5">UPC: {item.upc}</p>
+          )}
         </div>
         <div className="flex gap-2">
           <button
