@@ -21,6 +21,10 @@ export interface OFFProduct {
  * Returns null if the product is not found.
  */
 export async function lookupByUPC(upc: string): Promise<OFFProduct | null> {
+  // Try cache first (for offline)
+  const cached = getOfflineCache(upc);
+  if (cached) return cached;
+
   try {
     const url = `${OFF_BASE}/api/v2/product/${encodeURIComponent(upc)}.json`;
 
@@ -57,7 +61,7 @@ export async function lookupByUPC(upc: string): Promise<OFFProduct | null> {
     else if (p.image_url) imageUrl = p.image_url;
     else if (p.image_small_url) imageUrl = p.image_small_url;
 
-    return {
+    const product: OFFProduct = {
       code: String(p.code || upc),
       name: (p.product_name || "").trim() || null as any,
       brand,
@@ -65,8 +69,53 @@ export async function lookupByUPC(upc: string): Promise<OFFProduct | null> {
       imageUrl,
       unitQuantity: p.quantity ?? null,
     };
+
+    // Cache result for offline use
+    setOfflineCache(upc, product);
+    return product;
+  } catch {
+    return cached; // Fallback to cached version on network error
+  }
+}
+
+// ── Offline cache helpers ─────────────────────────────────────────────────────
+
+const CACHE_KEY = "grocery-off-cache";
+const CACHE_MAX = 500;
+
+function getOfflineCache(upc: string): OFFProduct | null {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(CACHE_KEY) : null;
+    if (!raw) return null;
+    const cache: Record<string, { product: OFFProduct; ts: number }> = JSON.parse(raw);
+    const entry = cache[upc];
+    if (!entry) return null;
+    // 90-day expiry
+    if (Date.now() - entry.ts > 90 * 24 * 60 * 60 * 1000) {
+      delete cache[upc];
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); } catch {}
+      return null;
+    }
+    return entry.product;
   } catch {
     return null;
+  }
+}
+
+function setOfflineCache(upc: string, product: OFFProduct): void {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const cache: Record<string, { product: OFFProduct; ts: number }> = raw ? JSON.parse(raw) : {};
+    cache[upc] = { product, ts: Date.now() };
+    // Evict oldest if over limit
+    const keys = Object.keys(cache);
+    if (keys.length > CACHE_MAX) {
+      keys.sort((a, b) => (cache[a].ts ?? 0) - (cache[b].ts ?? 0));
+      for (const k of keys.slice(0, keys.length - CACHE_MAX)) delete cache[k];
+    }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // Storage full or unavailable — silently ignore
   }
 }
 

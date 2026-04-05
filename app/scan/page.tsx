@@ -5,6 +5,51 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 
+interface CachedProduct {
+  name: string;
+  brand: string | null;
+  category: string | null;
+  imageUrl: string | null;
+  code: string;
+  ts: number;
+}
+
+const CACHE_KEY = "grocery-scan-cache";
+
+function getCached(upc: string): CachedProduct | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const cache: Record<string, CachedProduct> = JSON.parse(raw);
+    const entry = cache[upc];
+    if (!entry) return null;
+    if (Date.now() - entry.ts > 90 * 24 * 60 * 60 * 1000) {
+      delete cache[upc];
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+      return null;
+    }
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
+function setCached(upc: string, product: CachedProduct): void {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const cache: Record<string, CachedProduct> = raw ? JSON.parse(raw) : {};
+    cache[upc] = product;
+    const keys = Object.keys(cache);
+    if (keys.length > 500) {
+      keys.sort((a, b) => cache[a].ts - cache[b].ts);
+      for (const k of keys.slice(0, keys.length - 500)) delete cache[k];
+    }
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // silent
+  }
+}
+
 export default function ScanPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -16,6 +61,7 @@ export default function ScanPage() {
     source?: string;
     item?: any;
     error?: string;
+    offline?: boolean;
   } | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -38,7 +84,6 @@ export default function ScanPage() {
   }
 
   async function processUPC(code: string) {
-    // Stop scanning
     if (scanLoopRef.current) {
       cancelAnimationFrame(scanLoopRef.current);
       scanLoopRef.current = null;
@@ -48,6 +93,17 @@ export default function ScanPage() {
       streamRef.current = null;
     }
     setScanning(false);
+
+    // Check offline cache first
+    const cached = getCached(code);
+    const isOffline = !navigator.onLine;
+
+    // If offline and we have a cache hit, show it directly
+    if (isOffline && cached) {
+      setResult({ found: true, source: "offline", item: cached, offline: true });
+      toast("Found cached product (offline)", "success");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -59,15 +115,22 @@ export default function ScanPage() {
       const data = await res.json();
       setResult(data);
 
-      // If product exists in DB, navigate to it
       if (data.found && data.source === "database" && data.item?.id) {
         toast("Found existing item!", "success");
         setTimeout(() => router.push(`/item/${data.item.id}`), 1200);
         return;
       }
 
-      // If found via Open Food Facts, offer to add
       if (data.found && data.source === "openfoodfacts") {
+        // Cache for offline use
+        setCached(code, {
+          name: data.item?.name ?? "",
+          brand: data.item?.brand ?? null,
+          category: data.item?.category ?? null,
+          imageUrl: data.item?.imageUrl ?? null,
+          code: data.item?.code ?? code,
+          ts: Date.now(),
+        });
         toast("Product found on Open Food Facts", "success");
         return;
       }
@@ -76,7 +139,15 @@ export default function ScanPage() {
         toast("Product not found — type UPC to add manually", "info");
       }
     } catch {
-      toast("Failed to lookup UPC", "error");
+      // Network error — try cache fallback
+      const fallback = getCached(code);
+      if (fallback) {
+        setResult({ found: true, source: "offline", item: fallback, offline: true });
+        toast("Using cached product (offline)", "success");
+        return;
+      }
+      toast("Network error — try again when online", "error");
+      setResult(null);
     } finally {
       setLoading(false);
     }
@@ -102,9 +173,7 @@ export default function ScanPage() {
           const codes = await detector.detect(videoRef.current);
           if (codes.length > 0) {
             const raw = codes[0].rawValue;
-            // Strip leading zero for UPC-A (13->12 digits)
             const cleaned = raw.length === 13 && raw.startsWith("0") ? raw.slice(1) : raw;
-            // Accept 12 or 13 digit codes
             if (/^\d{12,13}$/.test(cleaned)) {
               setInputUpc(cleaned);
               processUPC(cleaned);
@@ -153,6 +222,11 @@ export default function ScanPage() {
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 text-xl">←</button>
         <h2 className="text-2xl font-bold text-gray-900">Scan UPC</h2>
+        {!navigator.onLine && (
+          <span className="ml-auto text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
+            Offline
+          </span>
+        )}
       </div>
 
       {/* Camera / Scanner */}
@@ -198,7 +272,7 @@ export default function ScanPage() {
 
       {/* Result */}
       {result && (
-        <div className={`rounded-xl border p-5 ${result.found ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"}`}>
+        <div className={`rounded-xl border p-5 ${result.found ? result.offline ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"}`}>
           {result.found ? (
             <>
               <div className="flex items-start gap-4">
@@ -210,10 +284,13 @@ export default function ScanPage() {
                   />
                 )}
                 <div className="flex-1 min-w-0">
+                  {result.offline && (
+                    <p className="text-xs text-amber-600 font-medium mb-0.5">📦 Cached (offline)</p>
+                  )}
                   <p className="font-bold text-gray-900">{result.item?.name}</p>
                   {result.item?.brand && <p className="text-sm text-gray-500">{result.item.brand}</p>}
                   {result.item?.category && <p className="text-xs text-gray-400 mt-0.5">{result.item.category}</p>}
-                  {result.item?.upc && <p className="text-xs text-gray-400 font-mono mt-0.5">UPC: {result.item.upc}</p>}
+                  {result.item?.code && <p className="text-xs text-gray-400 font-mono mt-0.5">UPC: {result.item.code}</p>}
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
