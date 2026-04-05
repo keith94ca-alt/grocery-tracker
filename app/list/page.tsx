@@ -8,6 +8,7 @@ import type { DealResult } from "@/app/api/flyer-deals/route";
 import type { FlyerMatch } from "@/app/api/flyer-match/route";
 import { useRefreshOnFocus } from "@/lib/useRefreshOnFocus";
 import FlyerDealsModal, { type FlyerDealEntry } from "@/components/FlyerDealsModal";
+import { matchesTrackedItem } from "@/lib/flipp";
 
 interface ShoppingListItem {
   id: string;
@@ -339,10 +340,16 @@ export default function ShoppingListPage() {
 
   function findFlyerDeal(itemName: string): DealResult | undefined {
     const lower = itemName.toLowerCase();
+    // Exact match
     const exact = flyerDeals.get(lower);
     if (exact) return exact;
+    // Substring fallback
     for (const [key, deal] of flyerDeals) {
       if (lower.includes(key) || key.includes(lower)) return deal;
+    }
+    // Fuzzy keyword match via Flipp matching logic
+    for (const [, deal] of flyerDeals) {
+      if (matchesTrackedItem(deal.bestDeal.name, itemName)) return deal;
     }
     return undefined;
   }

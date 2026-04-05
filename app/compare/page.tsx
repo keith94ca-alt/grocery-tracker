@@ -52,62 +52,64 @@ export default function ComparePage() {
   async function computeComparison() {
     if (selectedIds.size === 0) return;
 
+    // Fetch all item prices in parallel
     const priceMap = new Map<number, StorePrice[]>();
-
-    for (const itemId of selectedIds) {
+    const fetches = Array.from(selectedIds).map(async (itemId) => {
       try {
         const res = await fetch(`/api/prices?itemId=${itemId}&limit=100`);
         const data = await res.json();
-        if (Array.isArray(data)) {
-          // Get the cheapest price per store (normalized to canonical unit)
-          const storePrices = new Map<string, StorePrice>();
-          for (const entry of data) {
-            if (entry.source !== "manual" && entry.source !== "receipt") continue;
-            const norm = normalizePrice(entry.unitPrice, entry.unit);
-            const existing = storePrices.get(entry.store);
-            if (!existing || norm.price < normalizePrice(existing.unitPrice, existing.unit).price) {
-              storePrices.set(entry.store, {
-                store: entry.store,
-                unitPrice: norm.price,
-                unit: norm.unit,
-                date: entry.date,
-              });
-            }
+        if (!Array.isArray(data)) return;
+        const storePrices = new Map<string, StorePrice>();
+        for (const entry of data) {
+          if (entry.source !== "manual" && entry.source !== "receipt") continue;
+          const norm = normalizePrice(entry.unitPrice, entry.unit);
+          const existing = storePrices.get(entry.store);
+          if (!existing || norm.price < normalizePrice(existing.unitPrice, existing.unit).price) {
+            storePrices.set(entry.store, {
+              store: entry.store,
+              unitPrice: norm.price,
+              unit: norm.unit,
+              date: entry.date,
+            });
           }
-          priceMap.set(itemId, Array.from(storePrices.values()));
         }
+        priceMap.set(itemId, Array.from(storePrices.values()));
       } catch {}
-    }
+    });
+    await Promise.all(fetches);
 
     setItemPrices(priceMap);
 
-    // Compute store totals
-    const storeTotals = new Map<string, { total: number; available: number; missing: number }>();
+    // Collect all unique stores across all items first
+    const allStores = new Set<string>();
+    for (const [, prices] of priceMap) {
+      for (const sp of prices) allStores.add(sp.store);
+    }
 
+    // Initialize store totals with all stores (so missing count works correctly)
+    const storeTotals = new Map<string, { total: number; available: number; missing: number }>();
+    for (const store of allStores) {
+      storeTotals.set(store, { total: 0, available: 0, missing: 0 });
+    }
+
+    // Fill in totals per item
     for (const itemId of selectedIds) {
       const prices = priceMap.get(itemId) || [];
       if (prices.length === 0) {
-        // Item has no prices - count as missing for all stores
-        for (const [, totals] of storeTotals) {
-          totals.missing++;
-        }
+        // Item has no prices — count as missing for ALL stores
+        for (const [, totals] of storeTotals) totals.missing++;
         continue;
       }
-      // Add to each store's total
       for (const sp of prices) {
         const existing = storeTotals.get(sp.store);
         if (existing) {
           existing.total += sp.unitPrice;
           existing.available++;
-        } else {
-          storeTotals.set(sp.store, { total: sp.unitPrice, available: 1, missing: selectedIds.size - 1 });
         }
       }
       // For stores that don't have this item, add to missing
       for (const [store, totals] of storeTotals) {
-        if (!prices.some((p) => p.store === store)) {
-          totals.missing++;
-        }
+        if (!prices.some((p) => p.store === store)) totals.missing++;
       }
     }
 
