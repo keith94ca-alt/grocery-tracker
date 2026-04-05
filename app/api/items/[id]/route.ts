@@ -45,6 +45,12 @@ export async function GET(
             latestStore: item.priceEntries[0]?.store ?? null,
             canonicalUnit,
             count: normalizedPrices.length,
+            // Source breakdown
+            bySource: item.priceEntries.reduce((acc, e) => {
+              const src = e.source || "manual";
+              acc[src] = (acc[src] || 0) + 1;
+              return acc;
+            }, {} as Record<string, number>),
           }
         : null;
 

@@ -41,6 +41,7 @@ interface ItemDetail {
     latestDate: string;
     latestStore: string;
     canonicalUnit: string;
+    bySource: Record<string, number>;
   } | null;
 }
 
@@ -691,6 +692,30 @@ export default function ItemPage() {
         <p className="text-xs text-center text-gray-400">
           Stats normalized to <strong>{canonicalUnit}</strong> for fair comparison
         </p>
+      )}
+
+      {/* Scan source breakdown */}
+      {item.stats?.bySource && Object.keys(item.stats.bySource).length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            📊 Scan History
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(item.stats.bySource).map(([source, count]) => {
+              const icon = source === "flyer" ? "🏷️" : source === "scan" ? "📷" : "✏️";
+              const label = source === "scan" ? "Scanned" : source === "flyer" ? "Flyer" : "Manual";
+              return (
+                <div key={source} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3">
+                  <span className="text-2xl">{icon}</span>
+                  <div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{count}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Price trend chart */}
