@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchFlyerBrowse, matchesTrackedItem } from "@/lib/flipp";
 
-const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "N2B3J1";
+const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "L7L7J5";
 
 export interface FlyerMatch {
   name: string;

@@ -9,7 +9,7 @@ services:
     environment:
       - DATABASE_URL=file:/data/prices.db
       - NODE_ENV=production
-      - FLIPP_POSTAL_CODE=N2B3J1
+      - FLIPP_POSTAL_CODE=L7L7J5
     volumes:
       - db-data-test:/data
     ports:
