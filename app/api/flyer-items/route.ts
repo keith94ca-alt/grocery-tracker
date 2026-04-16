@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchFlyerBrowse, matchesTrackedItem, FlippItem } from "@/lib/flipp";
 
-const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "N2B3J1";
+const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "L7L7J5";
 
 export interface TrackedMatch {
   id: number;

@@ -5,7 +5,7 @@ import { fetchFlyerBrowse, matchesTrackedItem, FlippItem } from "@/lib/flipp";
 import { normalizePrice, sameUnitGroup } from "@/lib/units";
 import { getFamilyId } from "@/lib/auth";
 
-const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "N2B3J1";
+const POSTAL_CODE = process.env.FLIPP_POSTAL_CODE || "L7L7J5";
 
 export interface DealResult {
   itemId: number;
