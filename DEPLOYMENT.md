@@ -41,7 +41,7 @@ No manual migration steps needed.
 |----------|---------|-------------|
 | `DATABASE_URL` | `file:/data/prices.db` | SQLite path (Docker volume) |
 | `NODE_ENV` | `production` | Set in Dockerfile |
-| `FLIPP_POSTAL_CODE` | `N2B3J1` | Postal code for flyer store filtering |
+| `FLIPP_POSTAL_CODE` | `L7L7J5` | Postal code for flyer store filtering |
 
 ## Docker Files
 
