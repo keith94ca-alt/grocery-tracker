@@ -14,7 +14,7 @@ export async function GET() {
 
     const stores = await prisma.store.findMany();
     const shoppingList = await prisma.shoppingListItem.findMany();
-    const dismissed = await prisma.flyerDismissed.findMany();
+    const dismissed = await prisma.dismissedFlyerMatch.findMany();
 
     const data = {
       version: 1,
