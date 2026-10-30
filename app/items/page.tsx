@@ -186,7 +186,6 @@ function EditModal({
             className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
             {saving ? "Saving…" : "Save"}
           </button>
-          </button>
         </div>
       </div>
     </div>
@@ -387,13 +386,6 @@ export default function ItemsPage() {
       const res = await fetch("/api/items?stats=true");
       const data = await res.json();
       if (Array.isArray(data)) {
-        const items: ManagedItem[] = data.map((d: { id: number; name: string; category: string; unit: string; watched: boolean; targetPrice: number | null; stats: { count: number; latest: number | null; latestStore: string | null; latestDate: string | null; canonicalUnit: string } | null }) => ({
-          id: d.id,
-          name: d.name,
-          category: d.category,
-          unit: d.unit,
-          watched: d.watched,
-          targetPrice: d.targetPrice,
         const items: ManagedItem[] = data.map((d: { id: number; name: string; category: string; unit: string; watched: boolean; targetPrice: number | null; upc: string | null; brand: string | null; imageUrl: string | null; stats: { count: number; latest: number | null; latestStore: string | null; latestDate: string | null; canonicalUnit: string } | null }) => ({
           id: d.id,
           name: d.name,
@@ -413,7 +405,6 @@ export default function ItemsPage() {
           } : null,
         }));
         setItems(items.sort((a, b) => a.name.localeCompare(b.name)));
-      }
       }
     } finally {
       setLoading(false);

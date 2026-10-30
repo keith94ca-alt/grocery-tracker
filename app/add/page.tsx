@@ -121,7 +121,6 @@ function AddForm() {
   const [dupWarning, setDupWarning] = useState<string | null>(null);
   const [recentEntries, setRecentEntries] = useState<{ itemName: string; store: string; date: string }[]>([]);
   const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
-  const [recentItems, setRecentItems] = useState<{ name: string; category: string; unit: string }[]>([]);
 
   // Load recent items + last store from API
   useEffect(() => {
