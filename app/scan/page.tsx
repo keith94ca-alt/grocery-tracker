@@ -65,6 +65,7 @@ export default function ScanPage() {
     offline?: boolean;
   } | null>(null);
   const [offlineHistory, setOfflineHistory] = useState<ResolvedScan[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<number | null>(null);
@@ -223,6 +224,17 @@ export default function ScanPage() {
   }, []);
 
   useEffect(() => {
+    const updateOnline = () => setIsOnline(navigator.onLine);
+    updateOnline();
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    return () => {
+      window.removeEventListener("online", updateOnline);
+      window.removeEventListener("offline", updateOnline);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!scanning) return;
     if (!("BarcodeDetector" in window)) {
       toast("Barcode scanning not supported — type UPC below", "error");
@@ -291,7 +303,7 @@ export default function ScanPage() {
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 text-xl">←</button>
         <h2 className="text-2xl font-bold text-gray-900">Scan UPC</h2>
-        {!navigator.onLine && (
+        {!isOnline && (
           <span className="ml-auto text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">
             Offline
           </span>

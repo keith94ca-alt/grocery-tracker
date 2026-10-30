@@ -17,7 +17,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [waitingForPermission, setWaitingForPermission] = useState(true);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(() => typeof navigator !== "undefined" ? !navigator.onLine : false);
   const [scanningUpc, setScanningUpc] = useState<string | null>(null);
   const [showOfflineNotice, setShowOfflineNotice] = useState(false);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
