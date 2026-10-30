@@ -108,14 +108,32 @@ export async function PATCH(
     const item = await prisma.item.update({ where: { id }, data });
     return NextResponse.json(item);
   } catch (error: unknown) {
-    // Prisma unique constraint violation (P2002) = name already taken
+    // Prisma unique constraint violation (P2002)
     if (
       error &&
       typeof error === "object" &&
       "code" in error &&
       (error as { code: string }).code === "P2002"
     ) {
-      return NextResponse.json({ error: "An item with that name already exists" }, { status: 409 });
+      const target =
+        "meta" in error &&
+        error.meta &&
+        typeof error.meta === "object" &&
+        "target" in error.meta
+          ? error.meta.target
+          : null;
+
+      const fields = Array.isArray(target)
+        ? target.map((value) => String(value))
+        : target
+          ? [String(target)]
+          : [];
+
+      const message = fields.includes("upc")
+        ? "That UPC is already assigned to another item"
+        : "An item with that name already exists";
+
+      return NextResponse.json({ error: message }, { status: 409 });
     }
     console.error("PATCH /api/items/[id] error:", error);
     return NextResponse.json({ error: "Failed to update item" }, { status: 500 });

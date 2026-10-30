@@ -47,10 +47,50 @@ function EditModal({
   const [scanning, setScanning] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const scanStreamRef = useRef<MediaStream | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
+  const scanActiveRef = useRef(false);
   const { toast } = useToast();
+
+  async function copyText(value: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = value;
+        input.setAttribute("readonly", "");
+        input.style.position = "absolute";
+        input.style.left = "-9999px";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      toast("UPC copied", "success");
+    } catch {
+      toast("Failed to copy UPC", "error");
+    }
+  }
+
+  const stopScan = useCallback(() => {
+    scanActiveRef.current = false;
+    if (scanFrameRef.current !== null) {
+      cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
+    if (scanStreamRef.current) {
+      scanStreamRef.current.getTracks().forEach((track) => track.stop());
+      scanStreamRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  useEffect(() => stopScan, [stopScan]);
 
   async function handleSave() {
     if (!name.trim()) { setError("Name is required"); return; }
+    stopScan();
     const upcClean = upc.trim() || undefined;
     if (upcClean && !/^\d{12,13}$/.test(upcClean)) { setError("UPC must be 12 or 13 digits"); return; }
     setSaving(true);
@@ -67,9 +107,17 @@ function EditModal({
           brand: brand.trim() || null,
         }),
       });
-      if (res.status === 409) { setError("An item with that name already exists"); return; }
+      if (res.status === 409) { const d = await res.json(); setError(d.error || "That item already exists"); return; }
       if (res.status === 400) { const d = await res.json(); setError(d.error || "Invalid input"); return; }
-      if (!res.ok) { setError("Failed to save — try again"); return; }
+      if (!res.ok) {
+        try {
+          const d = await res.json();
+          setError(d.error || "Failed to save — try again");
+        } catch {
+          setError("Failed to save — try again");
+        }
+        return;
+      }
       const updated = await res.json();
       toast(`Updated ${name.trim()}`, "success");
       onSaved({ ...updated, _count: item._count });
@@ -130,61 +178,98 @@ function EditModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               UPC <span className="text-gray-400 font-normal">(optional)</span>
             </label>
+            {item.upc && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg bg-gray-50 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500">Current UPC</p>
+                  <p className="font-mono text-sm text-gray-700 truncate">{item.upc}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(item.upc || "")}
+                  className="px-3 py-2 bg-white hover:bg-brand-50 border border-gray-200 text-gray-600 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors"
+                  title="Copy current UPC"
+                >
+                  Copy
+                </button>
+              </div>
+            )}
             <div className="flex gap-2">
-              <input type="text" value={upc} onChange={(e) => setUpc(e.target.value)}
-                placeholder="12 or 13 digit UPC"
+              <input type="text" value={upc} onChange={(e) => setUpc(e.target.value.replace(/[^\d]/g, "").slice(0, 13))}
+                placeholder={item.upc ? "Replace existing UPC" : "12 or 13 digit UPC"}
                 inputMode="numeric" maxLength={13}
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              {upc && (
+                <button
+                  type="button"
+                  onClick={() => setUpc("")}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors"
+                  title="Clear UPC"
+                >
+                  Clear
+                </button>
+              )}
               <button type="button" onClick={() => {
-                if (!('BarcodeDetector' in window)) {
-                  toast('Barcode scanning not supported on this device', 'error');
+                if (!("BarcodeDetector" in window)) {
+                  toast("Barcode scanning not supported on this device", "error");
                   return;
                 }
+                stopScan();
+                scanActiveRef.current = true;
                 setScanning(true);
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
                   .then(async (stream) => {
-                    const video = document.createElement('video');
+                    if (!scanActiveRef.current) {
+                      stream.getTracks().forEach((track) => track.stop());
+                      return;
+                    }
+                    scanStreamRef.current = stream;
+                    const video = document.createElement("video");
                     video.srcObject = stream;
                     await video.play();
-                    const detector = new (window as any).BarcodeDetector({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+                    if (!scanActiveRef.current) {
+                      stream.getTracks().forEach((track) => track.stop());
+                      scanStreamRef.current = null;
+                      return;
+                    }
+                    const detector = new (window as any).BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e"] });
                     const scan = async () => {
-                      if (!scanning) return;
+                      if (!scanActiveRef.current) return;
                       try {
                         const codes = await detector.detect(video);
                         if (codes.length > 0) {
-                          setUpc(codes[0].rawValue.replace(/^0/, ''));
-                          stream.getTracks().forEach(t => t.stop());
-                          setScanning(false);
-                          toast('UPC scanned!', 'success');
+                          setUpc(codes[0].rawValue.replace(/^0/, ""));
+                          stopScan();
+                          toast("UPC scanned!", "success");
                           return;
                         }
                       } catch {}
-                      requestAnimationFrame(scan);
+                      scanFrameRef.current = requestAnimationFrame(scan);
                     };
                     scan();
                   })
                   .catch(() => {
-                    toast('Camera access denied', 'error');
-                    setScanning(false);
+                    toast("Camera access denied", "error");
+                    stopScan();
                   });
-              }} className="px-3 py-2 bg-gray-100 hover:bg-brand-100 text-gray-600 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors" title="Scan UPC">
+              }} className="px-3 py-2 bg-gray-100 hover:bg-brand-100 text-gray-600 hover:text-brand-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50" title="Scan UPC" disabled={scanning}>
                 📷
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Scan with camera or type manually
+              Scan with camera, copy the existing UPC, or clear it before save
             </p>
           </div>
         </div>
 
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose}
+          <button onClick={() => { stopScan(); onClose(); }}
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50">
             Cancel
           </button>
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={saving || scanning}
             className="flex-1 px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
-            {saving ? "Saving…" : "Save"}
+            {saving ? "Saving…" : scanning ? "Scanning…" : "Save"}
           </button>
         </div>
       </div>
@@ -622,6 +707,29 @@ function ItemRow({
         title={item.watched ? "Remove from watchlist" : "Add to watchlist"}>
         {item.watched ? "⭐" : "☆"}
       </button>
+
+      <Link href={`/item/${item.id}`} className="shrink-0">
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name}
+            className="w-10 h-10 rounded-lg object-cover bg-gray-100"
+            loading="lazy"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.style.display = "none";
+              const fallback = target.nextElementSibling as HTMLDivElement | null;
+              if (fallback) fallback.style.display = "flex";
+            }}
+          />
+        ) : null}
+        <div
+          className="w-10 h-10 rounded-lg bg-brand-50 text-brand-700 items-center justify-center text-lg"
+          style={{ display: item.imageUrl ? "none" : "flex" }}
+        >
+            🛒
+        </div>
+      </Link>
 
       {/* Info */}
       <Link href={`/item/${item.id}`} className="flex-1 min-w-0">

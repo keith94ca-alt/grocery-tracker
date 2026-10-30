@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
+import { queueOfflineScan, getPendingQueue } from "@/lib/scan-offline";
 
 interface BarcodeScannerProps {
   onScan: (upc: string) => void;
@@ -16,6 +17,9 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [waitingForPermission, setWaitingForPermission] = useState(true);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [scanningUpc, setScanningUpc] = useState<string | null>(null);
+  const [showOfflineNotice, setShowOfflineNotice] = useState(false);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -79,9 +83,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
             if (/^\d{12,13}$/.test(text)) {
               // Vibrate on success (if supported)
               if (navigator.vibrate) navigator.vibrate(100);
-              cleanup();
-              setIsScanning(false);
-              onScan(text);
+              handleScanResult(text);
             }
           }
           // Errors during scanning are normal (no barcode in frame) — ignore them
@@ -112,8 +114,47 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
       onError("UPC must be 12 or 13 digits");
       return;
     }
-    onScan(trimmed);
+    handleScanResult(trimmed);
   };
+
+  // Unified scan handler — checks online/offline
+  const handleScanResult = (upc: string) => {
+    if (!navigator.onLine) {
+      queueOfflineScan(upc);
+      setScanningUpc(upc);
+      setShowOfflineNotice(true);
+      cleanup();
+      setTimeout(() => {
+        setShowOfflineNotice(false);
+        setScanningUpc(null);
+        onClose();
+      }, 3000);
+    } else {
+      cleanup();
+      setIsScanning(false);
+      onScan(upc);
+    }
+  };
+
+  // Listen for online/offline changes
+  useEffect(() => {
+    const onOnline = () => { setIsOffline(false); };
+    const onOffline = () => { setIsOffline(true); };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
+  // Process pending scans on mount if we're online
+  useEffect(() => {
+    const pending = getPendingQueue();
+    if (pending.length > 0 && navigator.onLine) {
+      setShowOfflineNotice(false);
+    }
+  }, []);
 
   useEffect(() => {
     startScanning();

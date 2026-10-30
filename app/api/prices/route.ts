@@ -5,8 +5,38 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const itemId = searchParams.get("itemId");
   const limit = parseInt(searchParams.get("limit") || "50");
+  const scanStats = searchParams.get("scanStats") === "true";
 
   try {
+    if (scanStats) {
+      const scanEntries = await prisma.priceEntry.findMany({
+        where: { source: "scan" },
+        select: {
+          itemId: true,
+          store: true,
+          item: { select: { upc: true } },
+        },
+      });
+
+      const uniqueUpcs = new Set(
+        scanEntries
+          .map((entry) => entry.item.upc)
+          .filter((upc): upc is string => Boolean(upc))
+      ).size;
+
+      const storesTracked = new Set(
+        scanEntries
+          .map((entry) => entry.store?.trim())
+          .filter((store): store is string => Boolean(store))
+      ).size;
+
+      return NextResponse.json({
+        scannedItems: scanEntries.length,
+        uniqueUpcs,
+        storesTracked,
+      });
+    }
+
     const entries = await prisma.priceEntry.findMany({
       where: itemId ? { itemId: parseInt(itemId) } : undefined,
       orderBy: { date: "desc" },
@@ -24,7 +54,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { itemId, itemName, category, unit, price, quantity, store, date, notes, source, priceType } = body;
+    const { itemId, itemName, category, unit, price, quantity, store, date, notes, source, priceType, upc, brand, imageUrl } = body;
 
     // Support both itemId (when editing an existing item's price) and itemName (new entry)
     if (!itemId && !itemName?.trim()) {
@@ -58,15 +88,45 @@ export async function POST(request: NextRequest) {
         item.unit = unit;
       }
     } else {
-      item = await prisma.item.upsert({
-        where: { name: itemName.trim() },
-        update: {},
-        create: {
-          name: itemName.trim(),
-          category: category || "Other",
-          unit: unit || "each",
-        },
-      });
+      const cleanedUpc = typeof upc === "string" && /^\d{12,13}$/.test(upc.trim()) ? upc.trim() : null;
+      const cleanedBrand = typeof brand === "string" ? brand.trim() || null : null;
+      const cleanedImageUrl = typeof imageUrl === "string" ? imageUrl.trim() || null : null;
+
+      if (cleanedUpc) {
+        item = await prisma.item.upsert({
+          where: { upc: cleanedUpc },
+          update: {
+            name: itemName.trim(),
+            category: category || "Other",
+            unit: unit || "each",
+            brand: cleanedBrand,
+            imageUrl: cleanedImageUrl,
+          },
+          create: {
+            name: itemName.trim(),
+            category: category || "Other",
+            unit: unit || "each",
+            upc: cleanedUpc,
+            brand: cleanedBrand,
+            imageUrl: cleanedImageUrl,
+          },
+        });
+      } else {
+        item = await prisma.item.upsert({
+          where: { name: itemName.trim() },
+          update: {
+            ...(cleanedBrand ? { brand: cleanedBrand } : {}),
+            ...(cleanedImageUrl ? { imageUrl: cleanedImageUrl } : {}),
+          },
+          create: {
+            name: itemName.trim(),
+            category: category || "Other",
+            unit: unit || "each",
+            brand: cleanedBrand,
+            imageUrl: cleanedImageUrl,
+          },
+        });
+      }
     }
 
     // Upsert store

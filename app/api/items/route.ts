@@ -45,7 +45,18 @@ export async function GET(request: NextRequest) {
                 }
               : null;
 
-          return { id: item.id, name: item.name, category: item.category, unit: item.unit, watched: item.watched, targetPrice: item.targetPrice, stats };
+          return {
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            unit: item.unit,
+            watched: item.watched,
+            targetPrice: item.targetPrice,
+            upc: item.upc,
+            brand: item.brand,
+            imageUrl: item.imageUrl,
+            stats,
+          };
         })
         // Sort by most recently updated first
         .sort((a, b) => {
@@ -76,29 +87,58 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, category, unit, watched } = body;
+    const { name, category, unit, watched, upc, brand, imageUrl, placeholder } = body;
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Item name is required" }, { status: 400 });
     }
 
-    const item = await prisma.item.upsert({
-      where: { name: name.trim() },
-      update: {
-        category: category || "Other",
-        // Don't overwrite unit on update — it's set at creation time
-        // Only update unit if explicitly provided (not defaulted)
-        ...(unit !== undefined && unit !== "each" ? { unit } : {}),
-        // Only set watched=true if explicitly requested (never unwatch via upsert)
-        ...(watched === true ? { watched: true } : {}),
-      },
-      create: {
-        name: name.trim(),
-        category: category || "Other",
-        unit: unit || "each",
-        watched: watched === true,
-      },
-    });
+    const cleanedUpc = typeof upc === "string" && /^\d{12,13}$/.test(upc.trim()) ? upc.trim() : null;
+    const cleanedBrand = typeof brand === "string" ? brand.trim() || null : null;
+    const cleanedImageUrl = typeof imageUrl === "string" ? imageUrl.trim() || null : null;
+
+    const isPlaceholder = placeholder === true;
+
+    const item = await prisma.item.upsert(
+      cleanedUpc
+        ? {
+            where: { upc: cleanedUpc },
+            update: {
+              ...(isPlaceholder ? {} : { name: name.trim(), category: category || "Other" }),
+              ...(unit !== undefined && unit !== "each" ? { unit } : {}),
+              ...(watched === true ? { watched: true } : {}),
+              ...(cleanedBrand !== null ? { brand: cleanedBrand } : {}),
+              ...(cleanedImageUrl !== null ? { imageUrl: cleanedImageUrl } : {}),
+            },
+            create: {
+              name: name.trim(),
+              category: category || "Other",
+              unit: unit || "each",
+              watched: watched === true,
+              upc: cleanedUpc,
+              brand: cleanedBrand,
+              imageUrl: cleanedImageUrl,
+            },
+          }
+        : {
+            where: { name: name.trim() },
+            update: {
+              category: category || "Other",
+              ...(unit !== undefined && unit !== "each" ? { unit } : {}),
+              ...(watched === true ? { watched: true } : {}),
+              ...(cleanedBrand !== null ? { brand: cleanedBrand } : {}),
+              ...(cleanedImageUrl !== null ? { imageUrl: cleanedImageUrl } : {}),
+            },
+            create: {
+              name: name.trim(),
+              category: category || "Other",
+              unit: unit || "each",
+              watched: watched === true,
+              brand: cleanedBrand,
+              imageUrl: cleanedImageUrl,
+            },
+          }
+    );
 
     return NextResponse.json(item, { status: 201 });
   } catch (error) {

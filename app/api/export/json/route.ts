@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const items = await prisma.item.findMany({
@@ -14,7 +16,7 @@ export async function GET() {
 
     const stores = await prisma.store.findMany();
     const shoppingList = await prisma.shoppingListItem.findMany();
-    const dismissed = await prisma.flyerDismissed.findMany();
+    const dismissed = await prisma.dismissedFlyerMatch.findMany();
 
     const data = {
       version: 1,

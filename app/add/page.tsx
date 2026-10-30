@@ -96,8 +96,8 @@ function AddForm() {
   const [scanningUpc, setScanningUpc] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    itemName: searchParams.get("item") || "",
-    category: "Other",
+    itemName: searchParams.get("item") || searchParams.get("name") || "",
+    category: searchParams.get("category") || "Other",
     unit: "each",
     price: "",
     quantity: "1",
@@ -105,6 +105,10 @@ function AddForm() {
     date: new Date().toISOString().split("T")[0],
     notes: "",
     priceType: "normal",
+    upc: searchParams.get("upc") || "",
+    brand: searchParams.get("brand") || "",
+    imageUrl: searchParams.get("imageUrl") || "",
+    source: searchParams.get("source") === "scan" ? "scan" : "manual",
   });
 
   const [packMode, setPackMode] = useState(false);
@@ -160,6 +164,42 @@ function AddForm() {
     if (!form.itemName) itemInputRef.current?.focus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const nextItemName = searchParams.get("item") || searchParams.get("name") || "";
+    const nextCategory = searchParams.get("category") || "Other";
+    const nextUpc = searchParams.get("upc") || "";
+    const nextBrand = searchParams.get("brand") || "";
+    const nextImageUrl = searchParams.get("imageUrl") || "";
+    const nextSource = searchParams.get("source") === "scan" ? "scan" : "manual";
+    const hasScanPayload = Boolean(nextItemName || nextUpc || nextBrand || nextImageUrl || nextSource === "scan");
+
+    setForm((prev) => ({
+      ...prev,
+      itemName: hasScanPayload ? nextItemName : "",
+      category: hasScanPayload ? nextCategory : "Other",
+      unit: "each",
+      price: "",
+      quantity: "1",
+      notes: "",
+      priceType: "normal",
+      upc: nextUpc,
+      brand: nextBrand,
+      imageUrl: nextImageUrl,
+      source: nextSource,
+    }));
+
+    setPackMode(false);
+    setPackCount("1");
+    setPackSizeVal("");
+    setPackSizeUnit("mL");
+    setItemSuggestions([]);
+    setStoreSuggestions([]);
+    setShowItemDropdown(false);
+    setShowStoreDropdown(false);
+    setError("");
+    setDupWarning(null);
+  }, [searchParams]);
 
   // Item autocomplete
   useEffect(() => {
@@ -243,6 +283,10 @@ function AddForm() {
           itemName: item.name || prev.itemName,
           category: item.category || "Other",
           unit,
+          upc,
+          brand: item.brand || prev.brand,
+          imageUrl: item.imageUrl || prev.imageUrl,
+          source: "scan",
         }));
         toast(`Found: ${item.name}` + (item.brand ? ` (${item.brand})` : ""), "success");
       } else {
@@ -305,6 +349,10 @@ function AddForm() {
         date: new Date().toISOString().split("T")[0],
         notes: "",
         priceType: "normal",
+        upc: "",
+        brand: "",
+        imageUrl: "",
+        source: "manual",
       }));
       setPackMode(false);
       setPackCount("1");

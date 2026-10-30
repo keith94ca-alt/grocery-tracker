@@ -28,6 +28,7 @@ interface ItemDetail {
   name: string;
   category: string;
   unit: string;
+  createdAt: string;
   targetPrice: number | null;
   upc: string | null;
   brand: string | null;
@@ -292,6 +293,12 @@ function formatDate(dateStr: string) {
   });
 }
 
+function formatShortDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("en-CA", {
+    month: "short", day: "numeric",
+  });
+}
+
 // ── Edit Price Entry Modal ────────────────────────────────────────────────────
 
 const UNITS = ["each", "per lb", "per kg", "per 100g", "per L", "per 100mL"];
@@ -435,6 +442,31 @@ export default function ItemPage() {
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetInput, setTargetInput] = useState("");
   const [targetUnit, setTargetUnit] = useState<string>("per kg");
+  const [itemLightboxImg, setItemLightboxImg] = useState<string | null>(null);
+  const [heroImageFailed, setHeroImageFailed] = useState(false);
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
+
+  async function copyText(value: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = value;
+        input.setAttribute("readonly", "");
+        input.style.position = "absolute";
+        input.style.left = "-9999px";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      toast("UPC copied", "success");
+    } catch {
+      toast("Failed to copy UPC", "error");
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/items/${params.id}`)
@@ -502,6 +534,12 @@ export default function ItemPage() {
     }
   }
 
+  useEffect(() => {
+    setHeroImageLoaded(false);
+    setHeroImageFailed(false);
+    setHeroImageIndex(0);
+  }, [item?.imageUrl, deal?.bestDeal.imageUrl, item?.id]);
+
   if (loading) return (
     <div className="px-4 py-8 text-center text-gray-500">
       <div className="text-4xl animate-pulse">⏳</div>
@@ -519,26 +557,39 @@ export default function ItemPage() {
 
   const latest = item.priceEntries[0];
   const canonicalUnit = item.stats?.canonicalUnit ?? item.unit;
+  const heroImages = [item.imageUrl, deal?.bestDeal.imageUrl].filter(
+    (value, index, array): value is string => Boolean(value) && array.indexOf(value) === index
+  );
+  const heroImageUrl = heroImageFailed ? null : heroImages[heroImageIndex] ?? null;
+  const heroImageSource =
+    heroImageUrl === item.imageUrl
+      ? "Open Food Facts"
+      : heroImageUrl === deal?.bestDeal.imageUrl
+        ? "Flipp"
+        : null;
 
   return (
     <div className="px-4 py-4 space-y-5">
+      {itemLightboxImg && heroImageUrl && (
+        <ImageLightbox src={itemLightboxImg} alt={item.name} onClose={() => setItemLightboxImg(null)} />
+      )}
+
       {/* Header */}
       <div className="flex items-start gap-3">
         <button onClick={() => router.back()} className="text-gray-400 hover:text-gray-600 mt-1 text-xl">←</button>
-        {item.imageUrl && (
-          <img
-            src={item.imageUrl}
-            alt={item.name}
-            className="w-16 h-16 rounded-xl object-cover bg-gray-100 shrink-0"
-            loading="eager"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        )}
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold text-gray-900">{item.name}</h2>
           <p className="text-sm text-gray-500">{item.brand ? `${item.brand} · ${item.category}` : item.category}</p>
           {item.upc && (
-            <p className="text-xs text-gray-400 font-mono mt-0.5">UPC: {item.upc}</p>
+            <button
+              onClick={() => {
+                copyText(item.upc || "");
+              }}
+              className="text-xs text-gray-400 hover:text-brand-600 font-mono mt-0.5"
+              title="Copy UPC"
+            >
+              UPC: {item.upc} · Copy
+            </button>
           )}
         </div>
         <div className="flex gap-2">
@@ -569,6 +620,48 @@ export default function ItemPage() {
             + Add
           </Link>
         </div>
+      </div>
+
+      <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white">
+        {heroImageUrl ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => setItemLightboxImg(heroImageUrl)}
+              className="block w-full bg-gray-50"
+              title="Expand product image"
+            >
+              {!heroImageLoaded && <div className="h-64 animate-pulse bg-gray-100" />}
+              <img
+                src={heroImageUrl}
+                alt={item.name}
+                className={`w-full h-64 object-contain bg-gray-50 ${heroImageLoaded ? "block" : "hidden"}`}
+                loading="eager"
+                onLoad={() => setHeroImageLoaded(true)}
+                onError={() => {
+                  setHeroImageLoaded(false);
+                  setHeroImageIndex((current) => {
+                    if (current + 1 < heroImages.length) {
+                      return current + 1;
+                    }
+                    setHeroImageFailed(true);
+                    return current;
+                  });
+                }}
+              />
+            </button>
+            {heroImageSource && (
+              <div className="border-t border-gray-100 px-3 py-2 text-xs text-gray-500">
+                Image source: {heroImageSource}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-48 flex flex-col items-center justify-center bg-brand-50 text-brand-700">
+            <div className="text-6xl">🛒</div>
+            <p className="mt-2 text-sm font-medium">No product image yet</p>
+          </div>
+        )}
       </div>
 
       {/* Flyer deal banner — appears when Flipp has a match */}
@@ -695,28 +788,59 @@ export default function ItemPage() {
       )}
 
       {/* Scan source breakdown */}
-      {item.stats?.bySource && Object.keys(item.stats.bySource).length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            📊 Scan History
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(item.stats.bySource).map(([source, count]) => {
-              const icon = source === "flyer" ? "🏷️" : source === "scan" ? "📷" : "✏️";
-              const label = source === "scan" ? "Scanned" : source === "flyer" ? "Flyer" : "Manual";
-              return (
-                <div key={source} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3">
-                  <span className="text-2xl">{icon}</span>
-                  <div>
-                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{count}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+      {(item.upc || (item.stats?.bySource && Object.keys(item.stats.bySource).length > 0)) && (() => {
+        const scanEntries = item.priceEntries
+          .filter((entry) => entry.source === "scan")
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const firstScan = scanEntries[0] ?? null;
+        const firstTrackedAt = !firstScan && item.upc ? item.createdAt : null;
+        const lastUpdate = item.priceEntries[0] ?? null;
+        const sourceStats = item.stats?.bySource ?? {};
+
+        return (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              📊 Scan History
+            </h3>
+            {Object.keys(sourceStats).length > 0 && (
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(sourceStats).map(([source, count]) => {
+                const icon = source === "flyer" ? "🏷️" : source === "scan" ? "📷" : "✏️";
+                const label = source === "scan" ? "Scanned" : source === "flyer" ? "Flyer" : "Manual";
+                return (
+                  <div key={source} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 flex items-center gap-3">
+                    <span className="text-2xl">{icon}</span>
+                    <div>
+                      <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{count}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+                })}
+              </div>
+            )}
+            {(firstScan || firstTrackedAt || lastUpdate) && (
+              <div className="mt-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 space-y-1.5">
+                {firstScan && (
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">Scanned on:</span> {formatShortDate(firstScan.date)} at {firstScan.store}
+                  </p>
+                )}
+                {!firstScan && firstTrackedAt && (
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">UPC tracked since:</span> {formatShortDate(firstTrackedAt)}
+                  </p>
+                )}
+                {lastUpdate && (
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <span className="font-medium">Last price update:</span> {formatShortDate(lastUpdate.date)} at {lastUpdate.store}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Price trend chart */}
       {item.priceEntries.length >= 2 && (

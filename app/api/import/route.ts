@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { matchesTrackedItem, simplifyFlyerName } from "@/lib/flipp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,6 +88,54 @@ async function handleJsonImport(request: NextRequest) {
   return NextResponse.json({ imported, skipped, total: data.items.length });
 }
 
+function normalizeImportName(name: string) {
+  return simplifyFlyerName(name)
+    .toLowerCase()
+    .replace(/\b\d+(?:[.,]\d+)?\s?(?:ml|l|g|kg|lb|oz|pack|pk|ct)\b/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function importKeywords(name: string) {
+  return normalizeImportName(name)
+    .split(" ")
+    .filter((word) => word && !/^\d+$/.test(word) && !/^(ml|l|g|kg|lb|oz|pack|pk|ct)$/.test(word));
+}
+
+function keywordSubsetMatch(a: string[], b: string[]) {
+  if (a.length < 2 || b.length < 2) return false;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  const smaller = setA.size <= setB.size ? setA : setB;
+  const larger = setA.size <= setB.size ? setB : setA;
+  return Array.from(smaller).every((word) => larger.has(word));
+}
+
+function findFuzzyNameMatch(
+  itemName: string,
+  items: { id: number; name: string }[]
+) {
+  const exact = items.find((item) => item.name.toLowerCase() === itemName.toLowerCase());
+  if (exact) return exact;
+
+  const normalizedInput = normalizeImportName(itemName);
+  const inputKeywords = importKeywords(itemName);
+
+  return items.find((item) => {
+    const normalizedExisting = normalizeImportName(item.name);
+    const existingKeywords = importKeywords(item.name);
+    return (
+      normalizedInput === normalizedExisting ||
+      normalizedInput.includes(normalizedExisting) ||
+      normalizedExisting.includes(normalizedInput) ||
+      keywordSubsetMatch(inputKeywords, existingKeywords) ||
+      matchesTrackedItem(itemName, item.name) ||
+      matchesTrackedItem(item.name, itemName)
+    );
+  }) || null;
+}
+
 async function handleCsvImport(request: NextRequest) {
   const csv = await request.text();
   const lines = csv.trim().split("\n");
@@ -96,9 +145,10 @@ async function handleCsvImport(request: NextRequest) {
   }
 
   // Parse header
-  const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
+  const header = parseCsvRow(lines[0]).map((h) => h.trim().toLowerCase());
   const dateIdx = header.indexOf("date");
-  const itemIdx = header.indexOf("item");
+  const nameIdx = header.indexOf("name");
+  const itemIdx = nameIdx >= 0 ? nameIdx : header.indexOf("item");
   const categoryIdx = header.indexOf("category");
   const storeIdx = header.indexOf("store");
   const priceIdx = header.indexOf("price");
@@ -113,31 +163,22 @@ async function handleCsvImport(request: NextRequest) {
 
   let imported = 0;
   let skipped = 0;
+  let upcMatched = 0;
+  let upcCreated = 0;
+  let nameMatched = 0;
+  const existingItems = await prisma.item.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 
   for (let i = 1; i < lines.length; i++) {
     const cols = parseCsvRow(lines[i]);
     if (cols.length < 5) continue;
 
     const itemName = cols[itemIdx]?.trim();
-    if (!itemName) continue;
-
-    // Find or create item
-    let item = await prisma.item.findUnique({ where: { name: itemName } });
-    if (!item) {
-      const upc = upcIdx >= 0 ? cols[upcIdx]?.trim() || null : null;
-      const brand = brandIdx >= 0 ? cols[brandIdx]?.trim() || null : null;
-      const imageUrl = imageUrlIdx >= 0 ? cols[imageUrlIdx]?.trim() || null : null;
-
-      item = await prisma.item.create({
-        data: {
-          name: itemName,
-          category: cols[categoryIdx]?.trim() || "Other",
-          unit: cols[unitIdx]?.trim() || "each",
-          upc: upc || null,
-          brand: brand || null,
-          imageUrl: imageUrl || null,
-        },
-      });
+    if (!itemName) {
+      skipped++;
+      continue;
     }
 
     const price = parseFloat(cols[priceIdx]);
@@ -146,16 +187,65 @@ async function handleCsvImport(request: NextRequest) {
       continue;
     }
 
+    const rawUpc = upcIdx >= 0 ? cols[upcIdx]?.trim() || "" : "";
+    const validUpc = /^\d{12,13}$/.test(rawUpc) ? rawUpc : null;
+    const brand = brandIdx >= 0 ? cols[brandIdx]?.trim() || null : null;
+    const imageUrl = imageUrlIdx >= 0 ? cols[imageUrlIdx]?.trim() || null : null;
+    const category = cols[categoryIdx]?.trim() || "Other";
+    const rowUnit = cols[unitIdx]?.trim() || "each";
+
+    // Find or create item
+    let item = null;
+    if (validUpc) {
+      item = await prisma.item.findUnique({ where: { upc: validUpc } });
+      if (item) {
+        upcMatched++;
+      } else {
+        item = await prisma.item.create({
+          data: {
+            name: itemName,
+            category,
+            unit: rowUnit,
+            upc: validUpc,
+            brand,
+            imageUrl,
+          },
+        });
+        existingItems.push({ id: item.id, name: item.name });
+        upcCreated++;
+      }
+    }
+
+    if (!item) {
+      const fuzzyMatch = findFuzzyNameMatch(itemName, existingItems);
+      if (fuzzyMatch) {
+        item = await prisma.item.findUnique({ where: { id: fuzzyMatch.id } });
+        nameMatched++;
+      } else {
+        item = await prisma.item.create({
+          data: {
+            name: itemName,
+            category,
+            unit: rowUnit,
+            brand,
+            imageUrl,
+          },
+        });
+        existingItems.push({ id: item.id, name: item.name });
+      }
+    }
+
+    const quantity = parseFloat(cols[qtyIdx]) || 1;
     const store = cols[storeIdx]?.trim() || "Unknown";
-    const unitPrice = parseFloat(cols[unitPriceIdx]) || price / (parseFloat(cols[qtyIdx]) || 1);
+    const unitPrice = parseFloat(cols[unitPriceIdx]) || price / quantity;
 
     await prisma.priceEntry.create({
       data: {
         itemId: item.id,
         price,
-        quantity: parseFloat(cols[qtyIdx]) || 1,
+        quantity,
         unitPrice,
-        unit: cols[unitIdx]?.trim() || item.unit,
+        unit: rowUnit || item.unit,
         store,
         source: cols[sourceIdx]?.trim() || "manual",
         priceType: "normal",
@@ -173,7 +263,7 @@ async function handleCsvImport(request: NextRequest) {
     imported++;
   }
 
-  return NextResponse.json({ imported, skipped, total: lines.length - 1 });
+  return NextResponse.json({ imported, skipped, upcMatched, upcCreated, nameMatched, total: lines.length - 1 });
 }
 
 function parseCsvRow(line: string): string[] {

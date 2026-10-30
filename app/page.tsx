@@ -60,6 +60,7 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [trackedItems, setTrackedItems] = useState<{ id: number; name: string; targetPrice: number | null }[]>([]);
+  const [scanStats, setScanStats] = useState({ scannedItems: 0, uniqueUpcs: 0, storesTracked: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
@@ -88,10 +89,26 @@ export default function HomePage() {
     fetch("/api/prices?limit=10")
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setRecentEntries(data);
+        if (Array.isArray(data)) {
+          setRecentEntries(data);
+        }
       })
       .catch(() => {})
       .finally(() => setEntriesLoading(false));
+
+    fetch("/api/prices?scanStats=true")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && typeof data === "object") {
+          setScanStats({
+            scannedItems: Number(data.scannedItems) || 0,
+            uniqueUpcs: Number(data.uniqueUpcs) || 0,
+            storesTracked: Number(data.storesTracked) || 0,
+          });
+        }
+      })
+      .catch(() => {});
+
   }, []);
 
   function refreshData() {
@@ -333,6 +350,27 @@ export default function HomePage() {
           </section>
         );
       })()}
+
+      {/* UPC Tracking */}
+      {(scanStats.scannedItems > 0 || scanStats.uniqueUpcs > 0) && (
+        <section className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">UPC Tracking</h2>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-brand-50 rounded-xl p-3">
+              <p className="text-lg font-bold text-brand-700">{scanStats.scannedItems}</p>
+              <p className="text-xs text-gray-500">items scanned</p>
+            </div>
+            <div className="bg-green-50 rounded-xl p-3">
+              <p className="text-lg font-bold text-green-700">{scanStats.uniqueUpcs}</p>
+              <p className="text-xs text-gray-500">unique UPCs</p>
+            </div>
+            <div className="bg-blue-50 rounded-xl p-3">
+              <p className="text-lg font-bold text-blue-700">{scanStats.storesTracked}</p>
+              <p className="text-xs text-gray-500">stores tracked</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Deals This Week */}
       <section>

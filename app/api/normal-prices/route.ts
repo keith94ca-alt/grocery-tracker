@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { normalizePrice, sameUnitGroup } from "@/lib/units";
 
+export const dynamic = "force-dynamic";
+
 export interface NormalPrice {
   itemName: string;
   price: number;
